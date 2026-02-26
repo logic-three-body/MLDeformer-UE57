@@ -86,6 +86,11 @@ def _strict_thresholds() -> Dict[str, float]:
         "psnr_mean_min": 35.0,
         "psnr_min_min": 30.0,
         "edge_iou_mean_min": 0.97,
+        # Perceptual metrics
+        "ms_ssim_mean_min": 0.995,   # multi-scale SSIM; same bar as single-scale for identical renders
+        "ms_ssim_p05_min": 0.985,
+        "de2000_mean_max": 1.0,        # mean ΔE 2000 ≤ 1 JND (near-identical colour)
+        "de2000_p95_max": 3.0,         # 95th-pctile frame ≤ 3 ΔE (clearly perceptible threshold)
     }
 
 
@@ -102,6 +107,10 @@ def _pipeline_thresholds() -> Dict[str, float]:
         "psnr_mean_min": 15.0,
         "psnr_min_min": 12.0,
         "edge_iou_mean_min": 0.40,
+        "ms_ssim_mean_min": 0.60,
+        "ms_ssim_p05_min": 0.40,
+        "de2000_mean_max": 20.0,
+        "de2000_p95_max": 35.0,
     }
 
 

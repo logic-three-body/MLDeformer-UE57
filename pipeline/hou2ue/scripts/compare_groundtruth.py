@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 from PIL import Image
+from skimage.color import deltaE_ciede2000, rgb2lab
 
 from common import finalize_report, load_config, make_report, require_nested, stage_report_path, write_json
 
@@ -173,6 +174,71 @@ def _body_roi(gray: np.ndarray) -> np.ndarray:
     return gray[y0:y1, x0:x1]
 
 
+def _ms_ssim(ref_rgb: np.ndarray, src_rgb: np.ndarray) -> float:
+    """Multi-Scale SSIM across 3 octaves (full / half / quarter resolution), geometric mean.
+
+    Evaluates structural similarity at multiple scales, mirroring how the human
+    visual system processes spatial information. Better correlation with perceived
+    quality than single-scale SSIM, as it captures both fine-detail deformation
+    errors and broad luminance/structure differences.
+
+    Args:
+        ref_rgb: float32 [0,255] (H, W, 3) reference frame.
+        src_rgb: float32 [0,255] (H, W, 3) source frame.
+
+    Returns:
+        Scalar in [0, 1]. 1.0 = perceptually identical.
+    """
+    scores: List[float] = []
+    for scale in [1.0, 0.5, 0.25]:
+        if scale < 1.0:
+            h, w = ref_rgb.shape[:2]
+            nh = max(int(h * scale), 11)
+            nw = max(int(w * scale), 11)
+            ref_down = np.asarray(
+                Image.fromarray(ref_rgb.astype(np.uint8)).resize((nw, nh), Image.LANCZOS),
+                dtype=np.float32,
+            )
+            src_down = np.asarray(
+                Image.fromarray(src_rgb.astype(np.uint8)).resize((nw, nh), Image.LANCZOS),
+                dtype=np.float32,
+            )
+            ref_g = np.mean(ref_down, axis=2)
+            src_g = np.mean(src_down, axis=2)
+        else:
+            ref_g = np.mean(ref_rgb, axis=2)
+            src_g = np.mean(src_rgb, axis=2)
+        scores.append(_ssim_global(ref_g, src_g))
+    # Geometric mean: penalises single-scale failures more severely than arithmetic mean.
+    product = 1.0
+    for s in scores:
+        product *= max(s, 1e-12)
+    return float(product ** (1.0 / len(scores)))
+
+
+def _delta_e_2000_mean(ref_rgb: np.ndarray, src_rgb: np.ndarray) -> float:
+    """Mean CIEDE 2000 colour-difference (ΔE 2000, ISO/CIE 11664-6).
+
+    The standard for perceptual colour difference. A value of 1 ΔE 2000 is
+    approximately the just-noticeable difference (JND) for an average observer.
+    Values > 3 are clearly perceptible; > 10 are strongly visible. This metric
+    exposes lighting, shader, and colour-grading regressions that SSIM and PSNR
+    can mask because they operate in linear-RGB or luminance space.
+
+    Args:
+        ref_rgb: float32 [0,255] (H, W, 3) reference frame.
+        src_rgb: float32 [0,255] (H, W, 3) source frame.
+
+    Returns:
+        Mean ΔE 2000 across all pixels (lower is better; ideal = 0).
+    """
+    ref_norm = np.clip(ref_rgb / 255.0, 0.0, 1.0)
+    src_norm = np.clip(src_rgb / 255.0, 0.0, 1.0)
+    ref_lab = rgb2lab(ref_norm)
+    src_lab = rgb2lab(src_norm)
+    return float(np.mean(deltaE_ciede2000(ref_lab, src_lab)))
+
+
 def _safe_read_json(path: Path) -> Dict[str, Any]:
     if not path.exists():
         return {}
@@ -272,12 +338,20 @@ def main() -> int:
         psnr_mean_min = float(thresholds.get("psnr_mean_min", 35.0))
         psnr_min_min = float(thresholds.get("psnr_min_min", 30.0))
         edge_iou_mean_min = float(thresholds.get("edge_iou_mean_min", 0.97))
+        ms_ssim_mean_min = float(thresholds.get("ms_ssim_mean_min", 0.995))
+        ms_ssim_p05_min = float(thresholds.get("ms_ssim_p05_min", 0.985))
+        de2000_mean_max = float(thresholds.get("de2000_mean_max", 1.0))
+        de2000_p95_max = float(thresholds.get("de2000_p95_max", 3.0))
         thresholds_obj = {
             "ssim_mean_min": ssim_mean_min,
             "ssim_p05_min": ssim_p05_min,
             "psnr_mean_min": psnr_mean_min,
             "psnr_min_min": psnr_min_min,
             "edge_iou_mean_min": edge_iou_mean_min,
+            "ms_ssim_mean_min": ms_ssim_mean_min,
+            "ms_ssim_p05_min": ms_ssim_p05_min,
+            "de2000_mean_max": de2000_mean_max,
+            "de2000_p95_max": de2000_p95_max,
         }
         thresholds_hash = _thresholds_hash(thresholds_obj)
         fail_on_count_mismatch = bool(compare_cfg.get("fail_on_frame_count_mismatch", True))
@@ -335,11 +409,15 @@ def main() -> int:
                 roi_ssim = _ssim_global(ref_roi, src_roi)
                 roi_psnr = _psnr(ref_roi, src_roi)
 
-                # Color (RGB) metrics — supplementary, not gating
+                # Color + perceptual quality metrics (RGB)
                 ref_rgb = _load_rgb(ref_path)
                 src_rgb = _load_rgb(src_path)
                 color_ssim = _ssim_color(ref_rgb, src_rgb)
                 color_psnr = _psnr_color(ref_rgb, src_rgb)
+                # MS-SSIM: multi-scale structural similarity (gating)
+                # ΔE 2000: ISO perceptual colour difference (gating)
+                ms_ssim = _ms_ssim(ref_rgb, src_rgb)
+                de2000 = _delta_e_2000_mean(ref_rgb, src_rgb)
 
                 rows.append(
                     {
@@ -353,6 +431,8 @@ def main() -> int:
                         "body_roi_psnr": roi_psnr,
                         "color_ssim": color_ssim,
                         "color_psnr": color_psnr,
+                        "ms_ssim": ms_ssim,
+                        "de2000": de2000,
                     }
                 )
 
@@ -369,6 +449,8 @@ def main() -> int:
             roi_psnr_values = np.asarray([row["body_roi_psnr"] for row in rows], dtype=np.float64)
             color_ssim_values = np.asarray([row["color_ssim"] for row in rows], dtype=np.float64)
             color_psnr_values = np.asarray([row["color_psnr"] for row in rows], dtype=np.float64)
+            ms_ssim_values = np.asarray([row["ms_ssim"] for row in rows], dtype=np.float64)
+            de2000_values = np.asarray([row["de2000"] for row in rows], dtype=np.float64)
 
             metrics_summary = {
                 "frame_count_compared": int(len(rows)),
@@ -385,6 +467,11 @@ def main() -> int:
                 "color_ssim_p05": float(np.percentile(color_ssim_values, 5)),
                 "color_psnr_mean": float(np.mean(color_psnr_values)),
                 "color_psnr_min": float(np.min(color_psnr_values)),
+                # Perceptual quality (gating)
+                "ms_ssim_mean": float(np.mean(ms_ssim_values)),
+                "ms_ssim_p05": float(np.percentile(ms_ssim_values, 5)),
+                "de2000_mean": float(np.mean(de2000_values)),
+                "de2000_p95": float(np.percentile(de2000_values, 95)),
             }
 
             gate_pass = (
@@ -393,6 +480,10 @@ def main() -> int:
                 and metrics_summary["psnr_mean"] >= psnr_mean_min
                 and metrics_summary["psnr_min"] >= psnr_min_min
                 and metrics_summary["edge_iou_mean"] >= edge_iou_mean_min
+                and metrics_summary["ms_ssim_mean"] >= ms_ssim_mean_min
+                and metrics_summary["ms_ssim_p05"] >= ms_ssim_p05_min
+                and metrics_summary["de2000_mean"] <= de2000_mean_max
+                and metrics_summary["de2000_p95"] <= de2000_p95_max
             )
 
             if fail_on_count_mismatch and len(ref_frames) != len(src_frames):
@@ -415,6 +506,8 @@ def main() -> int:
                 chunk_roi_psnr = np.asarray([v["body_roi_psnr"] for v in chunk], dtype=np.float64)
                 chunk_color_ssim = np.asarray([v["color_ssim"] for v in chunk], dtype=np.float64)
                 chunk_color_psnr = np.asarray([v["color_psnr"] for v in chunk], dtype=np.float64)
+                chunk_ms_ssim = np.asarray([v["ms_ssim"] for v in chunk], dtype=np.float64)
+                chunk_de2000 = np.asarray([v["de2000"] for v in chunk], dtype=np.float64)
                 window_metrics.append(
                     {
                         "start_frame": int(chunk[0]["frame_index"]),
@@ -429,6 +522,8 @@ def main() -> int:
                         "body_roi_psnr_mean": float(np.mean(chunk_roi_psnr)),
                         "color_ssim_mean": float(np.mean(chunk_color_ssim)),
                         "color_psnr_mean": float(np.mean(chunk_color_psnr)),
+                        "ms_ssim_mean": float(np.mean(chunk_ms_ssim)),
+                        "de2000_mean": float(np.mean(chunk_de2000)),
                     }
                 )
 

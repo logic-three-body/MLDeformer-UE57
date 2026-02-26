@@ -386,7 +386,11 @@
                                                                        "ssim_p05_min":  0.60,
                                                                        "psnr_mean_min":  22,
                                                                        "psnr_min_min":  14,
-                                                                       "edge_iou_mean_min":  0.75
+                                                                       "edge_iou_mean_min":  0.75,
+                                                                       "ms_ssim_mean_min":  0.80,
+                                                                       "ms_ssim_p05_min":  0.60,
+                                                                       "de2000_mean_max":  15.0,
+                                                                       "de2000_p95_max":  25.0
                                                                    },
                                                     "fail_on_frame_count_mismatch":  true
                                                 }
