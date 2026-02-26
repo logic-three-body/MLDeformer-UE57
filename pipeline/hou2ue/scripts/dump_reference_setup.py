@@ -66,6 +66,18 @@ def main() -> int:
     try:
         cfg = load_config(args.config)
         baseline_cfg = require_nested(cfg, ("reference_baseline",))
+
+        # UE57 compat: honour top-level reference_baseline.enabled=false
+        if not bool(baseline_cfg.get("enabled", True)):
+            finalize_report(
+                report,
+                status="success",
+                outputs={"enabled": False, "skipped": True, "reason": "reference_baseline.enabled=false"},
+                errors=[],
+            )
+            write_json(stage_report, report)
+            return 0
+
         strict_clone_cfg = baseline_cfg.get("strict_clone", {}) if isinstance(baseline_cfg.get("strict_clone"), dict) else {}
         enabled = bool(strict_clone_cfg.get("enabled", False))
         source = str(strict_clone_cfg.get("source", "") or "").strip().lower()

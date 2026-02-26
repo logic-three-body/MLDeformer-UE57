@@ -349,9 +349,9 @@
                "infer":  {
                              "map":  "/Game/Maps/L_MLD_LearningCorridor",
                              "test_animations":  [
-                                                     "/Game/Characters/Emil/Animation/Test/Emil_box_in_place_test",
-                                                     "/Game/Characters/Emil/Animation/Test/Emil_jog_inplace_test",
-                                                     "/Game/Characters/Emil/Animation/Test/Emil_rom_art_test"
+                                                     "/Game/Characters/Emil/Animation/MLD_test/Emil_box_in_place_test",
+                                                     "/Game/Characters/Emil/Animation/MLD_test/Emil_UpperBodyROM",
+                                                     "/Game/Characters/Emil/Animation/MLD_test/Emil_FullBodyROM"
                                                  ],
                              "deformer_assets":  [
                                                      "/Game/Characters/Emil/Deformers/MLD_NMMl_flesh_upperBody",
