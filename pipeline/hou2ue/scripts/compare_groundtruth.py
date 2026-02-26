@@ -211,9 +211,9 @@ def _update_infer_report(
     if not isinstance(errors, list):
         errors = []
 
+    marker = "ground truth compare stage failed"
     if compare_enabled and compare_status != "success":
         data["status"] = "failed"
-        marker = "ground truth compare stage failed"
         if not any(isinstance(x, dict) and x.get("message") == marker for x in errors):
             errors.append(
                 {
@@ -222,6 +222,12 @@ def _update_infer_report(
                     "ground_truth_compare_status": compare_status,
                 }
             )
+    else:
+        # Remove stale gt_compare failure markers now that compare succeeded (or is disabled)
+        errors = [x for x in errors if not (isinstance(x, dict) and x.get("message") == marker)]
+        # Re-evaluate overall status: revert to success only if no other errors remain
+        if not errors:
+            data["status"] = "success"
     data["errors"] = errors
 
     infer_path.write_text(json.dumps(data, ensure_ascii=True, indent=2), encoding="utf-8")
