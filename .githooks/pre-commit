@@ -1,0 +1,14 @@
+#!/bin/sh
+limit=5242880
+failed=0
+for file in $(git diff --cached --name-only); do
+  size=$(git cat-file -s :$file 2>/dev/null || true)
+  if [ -n "$size" ] && [ "$size" -gt "$limit" ]; then
+    echo "Error: $file is larger than 5MB ($size bytes). Commit aborted."
+    failed=1
+  fi
+done
+if [ $failed -eq 1 ]; then
+  exit 1
+fi
+exit 0
