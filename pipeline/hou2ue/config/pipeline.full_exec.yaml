@@ -1,0 +1,483 @@
+﻿{
+    "version":  1,
+    "debug_mode":  false,
+    "paths":  {
+                  "project_root":  ".",
+                  "uproject":  "D:/UE/Unreal Projects/UE57/MLDeformerSample/MLDeformerSample.uproject",
+                  "ue_editor_exe":  "D:/Program Files/Epic Games/UE_5.7/Engine/Binaries/Win64/UnrealEditor.exe",
+                  "python_exe":  "python",
+                  "art_source_root":  "D:/UE/Unreal Projects/MLDeformerSample_ArtSource/ArtSource",
+                  "hip_file":  "D:/UE/Unreal Projects/MLDeformerSample_ArtSource/ArtSource/simRoot/Mio_muscle_setup.hip",
+                  "houdini":  {
+                                  "hython_exe":  "D:/Program Files/Side Effects Software/Houdini 20.0.625/bin/hython.exe",
+                                  "hbatch_exe":  "",
+                                  "abcstitcher_exe":  "D:/Program Files/Side Effects Software/Houdini 20.0.625/bin/abcstitcher.exe"
+                              },
+                  "ue_project_root":  "D:/UE/Unreal Projects/UE57/MLDeformerSample"
+              },
+    "defaults":  {
+                     "stage":  "full",
+                     "profile":  "smoke",
+                     "input_animation_fbx":  "upperBody_7000.fbx"
+                 },
+    "profiles":  {
+                     "smoke":  {
+                                   "maxprocs":  6,
+                                   "pose_frames":  [
+                                                       1,
+                                                       120,
+                                                       130,
+                                                       140,
+                                                       150,
+                                                       165,
+                                                       358,
+                                                       370,
+                                                       380,
+                                                       390,
+                                                       400,
+                                                       430,
+                                                       440,
+                                                       450,
+                                                       460,
+                                                       470,
+                                                       500,
+                                                       530,
+                                                       550,
+                                                       580
+                                                   ]
+                               },
+                     "full":  {
+                                  "maxprocs":  10,
+                                  "pose_frames":  [
+                                                      1,
+                                                      120,
+                                                      130,
+                                                      140,
+                                                      150,
+                                                      165,
+                                                      358,
+                                                      370,
+                                                      380,
+                                                      390,
+                                                      400,
+                                                      430,
+                                                      440,
+                                                      450,
+                                                      460,
+                                                      470,
+                                                      500,
+                                                      530,
+                                                      550,
+                                                      580,
+                                                      590,
+                                                      600,
+                                                      610,
+                                                      640,
+                                                      650,
+                                                      685,
+                                                      720,
+                                                      730,
+                                                      735,
+                                                      736,
+                                                      1025,
+                                                      1035,
+                                                      1045,
+                                                      1055,
+                                                      1065,
+                                                      1070,
+                                                      1145,
+                                                      1165,
+                                                      1224,
+                                                      1233,
+                                                      1245,
+                                                      1255,
+                                                      1265,
+                                                      1334,
+                                                      1345,
+                                                      1370
+                                                  ]
+                              }
+                 },
+    "houdini":  {
+                    "reuse_existing_outputs":  true,
+                    "skip_rest_when_reusing_outputs":  true,
+                    "skip_pdg_when_reusing_outputs":  true,
+                    "allow_sample_padding":  true,
+                    "require_exact_prefix_outputs":  false,
+                    "nodes":  {
+                                  "pose_range":  "/tasks/pdg_sim/pose_range",
+                                  "local_scheduler":  "/tasks/pdg_sim/localscheduler",
+                                  "pdg_root":  "/tasks/pdg_sim",
+                                  "pdg_anim_input":  "/obj/import_geo/pdg_anim_for_training",
+                                  "rest_caches":  [
+                                                      "/obj/sim/REST_MUSCLE_CACHE",
+                                                      "/obj/sim/REST_MUSCLELINES_CACHE",
+                                                      "/obj/sim/REST_TISSUE_CACHE"
+                                                  ]
+                              },
+                    "required_pdg_output_suffixes":  [
+                                                         "_ML_PDG_tissue_mesh",
+                                                         "_ML_PDG_muscle_mesh"
+                                                     ],
+                    "coord_system":  {
+                                         "mode":  "explicit",
+                                         "houdini_unit":  "m",
+                                         "ue_unit":  "cm",
+                                         "scale_factor":  100.0,
+                                         "matrix_3x3":  [
+                                                            [
+                                                                1.0,
+                                                                0.0,
+                                                                0.0
+                                                            ],
+                                                            [
+                                                                0.0,
+                                                                0.0,
+                                                                1.0
+                                                            ],
+                                                            [
+                                                                0.0,
+                                                                1.0,
+                                                                0.0
+                                                            ]
+                                                        ],
+                                         "translation_offset":  [
+                                                                    0.0,
+                                                                    0.0,
+                                                                    0.0
+                                                                ],
+                                         "validate":  {
+                                                          "enabled":  true,
+                                                          "tolerance":  0.15,
+                                                          "fail_on_mismatch":  true
+                                                      }
+                                     }
+                },
+    "ue":  {
+               "imports":  {
+                               "skeletal_meshes":  [
+                                                       {
+                                                           "source_rel":  "SKM/skm_Emil.fbx",
+                                                           "destination":  "/Game/Characters/Emil/Models/Body/skm_Emil"
+                                                       },
+                                                       {
+                                                           "source_rel":  "SKM/skm_Emil_upper_costume.fbx",
+                                                           "destination":  "/Game/Characters/Emil/Models/Costume/SKM_Emil_UpperCostume"
+                                                       },
+                                                       {
+                                                           "source_rel":  "SKM/skm_Emil_lower_costume.fbx",
+                                                           "destination":  "/Game/Characters/Emil/Models/Costume/SKM_Emil_lowerCostume"
+                                                       }
+                                                   ],
+                               "animations":  [
+                                                  {
+                                                      "source_rel":  "Animation/Train/upperBody_7000.fbx",
+                                                      "destination":  "/Game/Characters/Emil/Animation/MLD_train/upperBody_7000"
+                                                  },
+                                                  {
+                                                      "source_rel":  "Animation/Train/lowerCostume_7500k.fbx",
+                                                      "destination":  "/Game/Characters/Emil/Animation/MLD_train/lowerCostume_7500k"
+                                                  },
+                                                  {
+                                                      "source_rel":  "Animation/Train/MLD_NN_upperCostume_PartId_0.fbx",
+                                                      "destination":  "/Game/Characters/Emil/Animation/MLD_NN_upperCostume_PartId_0"
+                                                  },
+                                                  {
+                                                      "source_rel":  "Animation/Train/MLD_NN_lowerCostume_PartId_0.fbx",
+                                                      "destination":  "/Game/Characters/Emil/Animation/MLD_NN_lowerCostume_PartId_0"
+                                                  },
+                                                  {
+                                                      "source_rel":  "Animation/Test/Emil_box_inplace_test.fbx",
+                                                      "destination":  "/Game/Characters/Emil/Animation/Test/Emil_box_in_place_test"
+                                                  },
+                                                  {
+                                                      "source_rel":  "Animation/Test/Emil_jog_inplace_test.fbx",
+                                                      "destination":  "/Game/Characters/Emil/Animation/Test/Emil_jog_inplace_test"
+                                                  },
+                                                  {
+                                                      "source_rel":  "Animation/Test/Emil_rom_art_test.fbx",
+                                                      "destination":  "/Game/Characters/Emil/Animation/Test/Emil_rom_art_test"
+                                                  }
+                                              ]
+                           },
+               "dynamic_assets":  {
+                                      "flesh_geom_cache_destination_template":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_upperBodyFlesh_{profile}",
+                                      "nnm_upper_geom_cache_destination_template":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_NN_upperCostume_{profile}",
+                                      "nnm_lower_geom_cache_destination_template":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_NN_lowerCostume_{profile}"
+                                  },
+               "flesh_geomcache_source":  {
+                                              "mode":  "fbx_anim",
+                                              "source_rel":  "Animation/Train/upperBodyFlesh_7000.fbx",
+                                              "preferred_geo_obj":  "realtime_body_mesh",
+                                              "track_sop_name":  "body_mesh",
+                                              "frame_start":  1,
+                                              "frame_end":  1000
+                                          },
+               "nnm_geomcache_sources":  {
+                                             "upper":  {
+                                                           "source_rel":  "SKM/skm_Emil_upper_costume.fbx",
+                                                           "preferred_geo_obj":  "clothing_top",
+                                                           "frame_start":  1,
+                                                           "frame_end":  240
+                                                       },
+                                             "lower":  {
+                                                           "source_rel":  "SKM/skm_Emil_lower_costume.fbx",
+                                                           "preferred_geo_obj":  "rm_emil_pant",
+                                                           "frame_start":  1,
+                                                           "frame_end":  240
+                                                       }
+                                         },
+               "deformer_assets":  {
+                                       "flesh":  {
+                                                     "asset_path":  "/Game/Characters/Emil/Deformers/MLD_NMMl_flesh_upperBody",
+                                                     "model_type":  "NMM",
+                                                     "skeletal_mesh":  "/Game/Characters/Emil/Models/Body/skm_Emil",
+                                                     "deformer_graph":  "/Game/Characters/Emil/Deformers/DG_LBS_Morph_RecomputeNormals",
+                                                     "training_input_anims":  [
+                                                                                  {
+                                                                                      "anim_sequence":  "/Game/Characters/Emil/Animation/MLD_train/upperBody_7000",
+                                                                                      "geometry_cache_template":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_upperBodyFlesh_{profile}",
+                                                                                      "enabled":  true
+                                                                                  }
+                                                                              ],
+                                                     "test_anim_sequence":  "/Game/Characters/Emil/Animation/Test/Emil_box_in_place_test",
+                                                     "model_overrides":  {
+
+                                                                         }
+                                                 },
+                                       "upper_costume":  {
+                                                             "asset_path":  "/Game/Characters/Emil/Deformers/MLD_NN_upperCostume",
+                                                             "model_type":  "NNM",
+                                                             "skeletal_mesh":  "/Game/Characters/Emil/Models/Costume/SKM_Emil_UpperCostume",
+                                                             "deformer_graph":  "/Game/Characters/Emil/Deformers/DG_DQ_Morph_RecomputeNormals",
+                                                             "training_input_anims":  [
+                                                                                          {
+                                                                                              "anim_sequence":  "/Game/Characters/Emil/Animation/MLD_NN_upperCostume_PartId_0",
+                                                                                              "geometry_cache_template":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_NN_upperCostume_{profile}",
+                                                                                              "enabled":  true
+                                                                                          }
+                                                                                      ],
+                                                             "test_anim_sequence":  "/Game/Characters/Emil/Animation/Test/Emil_jog_inplace_test",
+                                                             "nnm_section_overrides":  [
+                                                                                           {
+                                                                                               "neighbor_poses":  "/Game/Characters/Emil/Animation/MLD_NN_upperCostume_PartId_0",
+                                                                                               "neighbor_meshes_template":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_NN_upperCostume_{profile}",
+                                                                                               "mesh_index":  0,
+                                                                                               "num_pca_coeffs":  64,
+                                                                                               "excluded_frames":  [
+
+                                                                                                                   ]
+                                                                                           }
+                                                                                       ],
+                                                             "model_overrides":  {
+                                                                                     "b_use_pca":  false,
+                                                                                     "num_basis_per_section":  64,
+                                                                                     "b_use_dual_quaternion_deltas":  true,
+                                                                                     "decay_factor":  0.85,
+                                                                                     "nearest_neighbor_offset_weight":  1.0,
+                                                                                     "num_iterations":  5000,
+                                                                                     "batch_size":  256,
+                                                                                     "learning_rate":  0.001,
+                                                                                     "early_stop_epochs":  100,
+                                                                                     "hidden_layer_dims":  [
+                                                                                                               128,
+                                                                                                               128
+                                                                                                           ],
+                                                                                     "b_use_rbf":  false,
+                                                                                     "rbf_sigma":  1.0
+                                                                                 }
+                                                         },
+                                       "lower_costume":  {
+                                                             "asset_path":  "/Game/Characters/Emil/Deformers/MLD_NN_lowerCostume",
+                                                             "model_type":  "NNM",
+                                                             "skeletal_mesh":  "/Game/Characters/Emil/Models/Costume/SKM_Emil_lowerCostume",
+                                                             "deformer_graph":  "/Game/Characters/Emil/Deformers/DG_DQ_Morph_RecomputeNormals",
+                                                             "training_input_anims":  [
+                                                                                          {
+                                                                                              "anim_sequence":  "/Game/Characters/Emil/Animation/MLD_NN_lowerCostume_PartId_0",
+                                                                                              "geometry_cache_template":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_NN_lowerCostume_{profile}",
+                                                                                              "enabled":  true
+                                                                                          }
+                                                                                      ],
+                                                             "test_anim_sequence":  "/Game/Characters/Emil/Animation/Test/Emil_rom_art_test",
+                                                             "nnm_section_overrides":  [
+                                                                                           {
+                                                                                               "neighbor_poses":  "/Game/Characters/Emil/Animation/MLD_NN_lowerCostume_PartId_0",
+                                                                                               "neighbor_meshes_template":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_NN_lowerCostume_{profile}",
+                                                                                               "mesh_index":  0,
+                                                                                               "num_pca_coeffs":  64,
+                                                                                               "excluded_frames":  [
+
+                                                                                                                   ]
+                                                                                           }
+                                                                                       ],
+                                                             "model_overrides":  {
+                                                                                     "b_use_pca":  false,
+                                                                                     "num_basis_per_section":  64,
+                                                                                     "b_use_dual_quaternion_deltas":  true,
+                                                                                     "decay_factor":  0.85,
+                                                                                     "nearest_neighbor_offset_weight":  1.0,
+                                                                                     "num_iterations":  5000,
+                                                                                     "batch_size":  256,
+                                                                                     "learning_rate":  0.001,
+                                                                                     "early_stop_epochs":  100,
+                                                                                     "hidden_layer_dims":  [
+                                                                                                               128,
+                                                                                                               128
+                                                                                                           ],
+                                                                                     "b_use_rbf":  false,
+                                                                                     "rbf_sigma":  1.0
+                                                                                 }
+                                                         }
+                                   },
+               "training_order":  [
+                                      "flesh",
+                                      "upper_costume",
+                                      "lower_costume"
+                                  ],
+               "training":  {
+                                "skip_train":  true,
+                                "training_data_source":  "reference",
+                                "determinism":  {
+                                                    "enabled":  true,
+                                                    "seed":  3407,
+                                                    "torch_deterministic":  true,
+                                                    "cudnn_deterministic":  true,
+                                                    "cudnn_benchmark":  false
+                                                }
+                            },
+               "infer":  {
+                             "map":  "/Game/Maps/L_MLD_LearningCorridor",
+                             "test_animations":  [
+                                                     "/Game/Characters/Emil/Animation/Test/Emil_box_in_place_test",
+                                                     "/Game/Characters/Emil/Animation/Test/Emil_jog_inplace_test",
+                                                     "/Game/Characters/Emil/Animation/Test/Emil_rom_art_test"
+                                                 ],
+                             "deformer_assets":  [
+                                                     "/Game/Characters/Emil/Deformers/MLD_NMMl_flesh_upperBody",
+                                                     "/Game/Characters/Emil/Deformers/MLD_NN_upperCostume",
+                                                     "/Game/Characters/Emil/Deformers/MLD_NN_lowerCostume"
+                                                 ],
+                             "console_commands":  [
+                                                      "stat mldeformerinference",
+                                                      "stat gpu"
+                                                  ]
+                         },
+               "ground_truth":  {
+                                    "enabled":  true,
+                                    "driver":  "main_sequence_direct",
+                                    "map":  "/Game/Main",
+                                    "level_sequence":  "/Game/Characters/Emil/Animation/Sequences/Main_Sequence",
+                                    "capture":  {
+                                                    "width":  1280,
+                                                    "height":  720,
+                                                    "output_format":  "png",
+                                                    "frame_window":  "full_sequence",
+                                                    "warmup_frames":  16,
+                                                    "use_reference_project":  false,
+                                                    "reference_uproject":  "Refference/MLDeformerSample.uproject",
+                                                    "static_reference_frames_dir":  "D:/UE/Unreal Projects/MLDeformerSample/pipeline/hou2ue/workspace/runs/20260226_170226_smoke/workspace/staging/smoke/gt/reference/frames"
+                                                },
+                                    "compare":  {
+                                                    "metrics_profile":  "strict",
+                                                    "thresholds":  {
+                                                                       "ssim_mean_min":  0.85,
+                                                                       "ssim_p05_min":  0.8,
+                                                                       "psnr_mean_min":  25,
+                                                                       "psnr_min_min":  20,
+                                                                       "edge_iou_mean_min":  0.75
+                                                                   },
+                                                    "fail_on_frame_count_mismatch":  true
+                                                }
+                                }
+           },
+    "reference_baseline":  {
+                               "enabled":  false,
+                               "reference_uproject":  "Refference/MLDeformerSample.uproject",
+                               "strict_clone":  {
+                                                    "enabled":  true,
+                                                    "source":  "refference_deformer_dump"
+                                                },
+                               "deformer_assets_override":  {
+                                                                "flesh":  {
+                                                                              "training_input_anims":  [
+                                                                                                           {
+                                                                                                               "anim_sequence":  "/Game/Characters/Emil/Animation/MLD_train/upperBodyFlesh_5kGreedyROM",
+                                                                                                               "geometry_cache":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_upperBodyFlesh_5kGreedyROM",
+                                                                                                               "enabled":  true
+                                                                                                           },
+                                                                                                           {
+                                                                                                               "anim_sequence":  "/Game/Characters/Emil/Animation/MLD_train/upperBodyFlesh_hero64",
+                                                                                                               "geometry_cache":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_upperBodyFlesh_hero64",
+                                                                                                               "enabled":  true
+                                                                                                           }
+                                                                                                       ]
+                                                                          },
+                                                                "upper_costume":  {
+                                                                                      "training_input_anims":  [
+                                                                                                                   {
+                                                                                                                       "anim_sequence":  "/Game/Characters/Emil/Animation/MLD_train/upperBody_7000",
+                                                                                                                       "geometry_cache":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_upperBody_Clothing_7000",
+                                                                                                                       "enabled":  true
+                                                                                                                   }
+                                                                                                               ],
+                                                                                      "nnm_section_overrides":  [
+                                                                                                                    {
+                                                                                                                        "neighbor_poses":  "/Game/Characters/Emil/Animation/MLD_NN_upperCostume_PartId_0",
+                                                                                                                        "neighbor_meshes":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_NN_upperCostume_0",
+                                                                                                                        "mesh_index":  0,
+                                                                                                                        "num_pca_coeffs":  64,
+                                                                                                                        "excluded_frames":  [
+
+                                                                                                                                            ]
+                                                                                                                    }
+                                                                                                                ]
+                                                                                  },
+                                                                "lower_costume":  {
+                                                                                      "training_input_anims":  [
+                                                                                                                   {
+                                                                                                                       "anim_sequence":  "/Game/Characters/Emil/Animation/MLD_train/lowerCostume_7500k",
+                                                                                                                       "geometry_cache":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_lowerCostume_7500",
+                                                                                                                       "enabled":  true
+                                                                                                                   }
+                                                                                                               ],
+                                                                                      "nnm_section_overrides":  [
+                                                                                                                    {
+                                                                                                                        "neighbor_poses":  "/Game/Characters/Emil/Animation/MLD_NN_lowerCostume_PartId_0",
+                                                                                                                        "neighbor_meshes":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_NN_lowerCostume_0",
+                                                                                                                        "mesh_index":  0,
+                                                                                                                        "num_pca_coeffs":  64,
+                                                                                                                        "excluded_frames":  [
+
+                                                                                                                                            ]
+                                                                                                                    }
+                                                                                                                ]
+                                                                                  }
+                                                            },
+                               "sync":  {
+                                            "strategy":  "two_phase",
+                                            "phase1_include_globs":  [
+                                                                         "Content/Characters/Emil/Deformers/*.uasset",
+                                                                         "Content/Characters/Emil/Animation/MLD_train/*.uasset",
+                                                                         "Content/Characters/Emil/Animation/MLD_test/*.uasset",
+                                                                         "Content/Characters/Emil/Animation/MLD_NN_*.uasset",
+                                                                         "Content/Characters/Emil/Models/**/*.uasset",
+                                                                         "Content/Main.umap",
+                                                                         "Content/Maps/L_MLD_LearningCorridor.umap",
+                                                                         "Content/Global/DemoRoom/LevelSequences/LS_NMM_Local.uasset",
+                                                                         "Content/Global/DemoRoom/LevelSequences/LS_NearestNeighbour.uasset",
+                                                                         "Content/Characters/Emil/Animation/Sequences/Main_Sequence*.uasset"
+                                                                     ],
+                                            "phase2_include_globs":  [
+                                                                         "Content/Characters/Emil/GeomCache/**",
+                                                                         "Content/Characters/Emil/Textures/T_Emil_*_N.uasset"
+                                                                     ],
+                                            "verify_hash":  true,
+                                            "backup_before_overwrite":  true,
+                                            "rollback_maps":  [
+                                                                  "/Game/Main",
+                                                                  "/Game/Maps/L_MLD_LearningCorridor"
+                                                              ]
+                                        }
+                           }
+}
