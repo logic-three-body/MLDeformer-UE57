@@ -1,0 +1,5 @@
+# Git LFS disabled: Unreal binary assets are tracked as regular Git blobs.
+*.uasset -text
+*.umap -text
+*.ubulk -text
+*.uexp -text
