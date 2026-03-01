@@ -83,7 +83,36 @@
 
 | # | 问题描述 | 影响阶段 | 状态 | 解决方案 |
 |---|---------|---------|------|---------|
-| F1 | 帧 400–599 质量劣化（SSIM≈0.76，PSNR≈21.5dB，Edge≈0.69）| gt_compare | ⚠️ 已记录 | 原因：UE5.5 预训练权重在 UE5.7 渲染引擎下有跨版本偏差。修复方案：Phase 3 — UE5.7 原生训练后重新比较。 |
+| F1 | **形变质量差距**（帧 470–490 最差：SSIM≈0.711，PSNR≈17dB，EdgeIoU≈0.50，ΔE≈8.67；帧 400–599 整体 SSIM≈0.76，Edge≈0.69）| gt_compare | ⚠️ 已记录 | **原因（形变分量）**：UE5.5 预训练 `.nmn` 权重在 UE5.7 推理系统下产生错误 mesh 形变（Body ROI SSIM < 全局 SSIM，错误集中于角色体型区域；EdgeIoU=0.50 = 轮廓/形状坍塌），而非仅色彩差异。**修复方案**：Phase T — 使用 UE5.7 原生训练数据重新训练，预期 F470–490 SSIM ≥ 0.88，EdgeIoU ≥ 0.92。 |
+| F2 | **渲染器基准差距**（F0–99 静止姿态 SSIM=0.918 vs UE5.5 基准 0.997，差距约 8%）| gt_compare | ✅ 已分析（接受为底线） | **原因（渲染器分量）**：两版本 `DefaultEngine.ini / [/Script/Engine.RendererSettings]` 完全相同，差距来自 UE 引擎内部算法变更（Lumen GI / VSM / TAA F0–99 帧 deformer 近零贡献），配置层面无法消除。**决策**：接受约 9% SSIM 底线，训练后目标定为 `ssim_mean ≥ 0.92`（而非 0.997）。 |
+
+---
+
+## 阶段 H：渲染器差距诊断（2026-03-01）
+
+> 说明两分量差距诊断的结论，为设定合理训练后目标提供依据。
+
+| # | 检查项 | 状态 | 备注 |
+|---|--------|------|------|
+| H1 | 比对两版本 `DefaultEngine.ini`：`[/Script/Engine.RendererSettings]` 完全相同 | ✅ | `UE57/Config/` 与 `Refference/Config/` 逐字节一致，排除配置差异 |
+| H2 | 识别渲染器内部变更分量（约 8% SSIM）：F0–99 静止帧已显示差距，deformer 贡献近零 | ✅ | SSIM<sub>F0-99</sub>=0.918 vs 0.997；此分量由 Lumen GI / VSM / TAA 算法变更引起，配置层面不可消除 |
+| H3 | 设定训练后质量目标：`ssim_mean_min` 0.80（debug_mode）→ 0.92（训练后），F470–490 SSIM ≥ 0.88，EdgeIoU ≥ 0.92 | ✅ | 已记录于 `pipeline.full_exec.yaml` `_thresholds_post_training_note` 注释 |
+
+---
+
+## 阶段 T：Phase 3 — UE5.7 原生训练（执行中）
+
+> 依赖前置条件：ArtSource 已核验（2026-03-01），PDG 部分输出可复用。
+
+| # | 检查项 | 状态 | 备注 |
+|---|--------|------|------|
+| T1 | ArtSource 核验：`.hip`、FBX 训练动画、Rest caches、部分 PDG 输出均存在 | ✅ | `simRoot/Mio_muscle_setup.hip` + `outputFiles/PDG_sim_MM_OLD_*/`（tissue_sim 完整，mesh partial）；`reuse_existing_outputs:true` + `allow_sample_padding:true` 可填充至 20 帧 |
+| T2 | `skip_train: false`（已改）| ✅ | `pipeline.full_exec.yaml` |
+| T3 | `training_data_source: "pipeline"`（已改）| ✅ | 同上 |
+| T4 | 执行 `run_all.ps1 -Stage full -Profile smoke -Config pipeline.full_exec.yaml` | ⬜ | 流水线：houdini → convert → ue_import → ue_setup → train → infer → gt_reference_capture → gt_source_capture → gt_compare → report |
+| T5 | 检查 `train_report.json`：3 个模型均 success，`.nmn` / `.ubnne` 路径有效 | ⬜ | 训练完成后验证 |
+| T6 | `gt_compare_report.json`：全局 SSIM ≥ 0.92，F470–490 SSIM ≥ 0.88，EdgeIoU ≥ 0.92 | ⬜ | 训练后 GT 对比验证 |
+| T7 | 达标后将 `ssim_mean_min` 由 0.80 提升至 0.90，移除 `debug_mode: true` | ⬜ | Phase V 验证通过后修改 |
 
 ---
 

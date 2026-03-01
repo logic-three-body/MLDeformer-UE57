@@ -336,9 +336,9 @@
                                       "lower_costume"
                                   ],
                "training":  {
-                                "skip_train":  true,
-                                "_skip_train_note":  "Phase 3: set skip_train=false once GeomCaches are available and Phase 2 API changes compile cleanly. SkinningMode audit (Phase 1) confirmed default=Linear — same as UE5.5; no skinning_mode override needed.",
-                                "training_data_source":  "reference",
+                                "skip_train":  false,
+                                "_skip_train_note":  "Phase 3 active (2026-03-01): ArtSource confirmed, PDG partial outputs reused via reuse_existing_outputs+allow_sample_padding. SkinningMode audit confirmed default=Linear, no override needed.",
+                                "training_data_source":  "pipeline",
                                 "_training_data_source_options":  "reference | pipeline  (use 'pipeline' when GeomCaches are produced by Houdini PDG and training_input_anims use {profile} templates)",
                                 "determinism":  {
                                                     "enabled":  true,
@@ -392,7 +392,8 @@
                                                                        "ms_ssim_mean_min":  0.78,
                                                                        "ms_ssim_p05_min":  0.60,
                                                                        "de2000_mean_max":  15.0,
-                                                                       "de2000_p95_max":  25.0
+                                                                       "de2000_p95_max":  25.0,
+                                                                       "_thresholds_post_training_note":  "Current thresholds are relaxed (debug_mode=true) for cross-engine UE5.5->UE5.7 comparison. Renderer baseline gap ~8% SSIM (Lumen/VSM/TAA internal changes) is non-configurable. After Phase T UE5.7 native training: raise ssim_mean_min 0.80->0.90, ssim_p05_min 0.60->0.80, edge_iou_mean_min 0.75->0.90, remove debug_mode. Target: ssim_mean>=0.92, F470-490 ssim>=0.88, edge_iou>=0.92."
                                                                    },
                                                     "fail_on_frame_count_mismatch":  true
                                                 }
