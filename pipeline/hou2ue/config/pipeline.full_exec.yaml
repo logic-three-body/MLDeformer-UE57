@@ -337,7 +337,9 @@
                                   ],
                "training":  {
                                 "skip_train":  true,
+                                "_skip_train_note":  "Phase 3: set skip_train=false once GeomCaches are available and Phase 2 API changes compile cleanly. SkinningMode audit (Phase 1) confirmed default=Linear — same as UE5.5; no skinning_mode override needed.",
                                 "training_data_source":  "reference",
+                                "_training_data_source_options":  "reference | pipeline  (use 'pipeline' when GeomCaches are produced by Houdini PDG and training_input_anims use {profile} templates)",
                                 "determinism":  {
                                                     "enabled":  true,
                                                     "seed":  3407,

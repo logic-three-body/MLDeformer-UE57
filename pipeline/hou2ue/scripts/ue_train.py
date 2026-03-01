@@ -49,6 +49,37 @@ def _request_class():
     raise RuntimeError("Cannot find MldTrainRequest struct in Unreal Python API")
 
 
+# Phase 3.2 — UE5.7 FMLDeformerTrainingDataProcessorAnim
+# In UE5.7 the engine introduced FMLDeformerTrainingDataProcessorAnim as a
+# wrapper struct for configuring training animation data.  However, the C++
+# bridge (MLDTrainAutomationLibrary) bypasses this struct entirely: it writes
+# directly into GeomModel->GetTrainingInputAnims() via ApplyTrainingInputs()
+# before calling ActiveModel->Train().  This means Python code does NOT need
+# to construct FMLDeformerTrainingDataProcessorAnim instances.
+#
+# The fallback below is kept for future-proofing: if an engine update removes
+# the direct GeomModel API and requires FMLDeformerTrainingDataProcessorAnim,
+# the bridge's ApplyTrainingInputs() will need to be updated — at which point
+# this function can be used from a custom Python helper that constructs the
+# wrapper structs.
+#
+# Current C++ path:  ue_train.py → MLDTrainAutomationLibrary.train_deformer_asset()
+#                    → ApplyTrainingInputs() [sets GeomModel->GetTrainingInputAnims()]
+#                    → ActiveModel->Train()
+#
+# Engine Python path (for reference, NOT used by this script):
+#   from mldeformer import training_helpers  # UE_5.7/Engine/.../Content/Python/
+#   training_helpers lives at:
+#   <UE_5.7>/Engine/Plugins/Animation/MLDeformer/MLDeformerFramework/Content/Python/mldeformer/training_helpers.py
+def _check_training_processor_api() -> bool:
+    """Return True if FMLDeformerTrainingDataProcessorAnim is Python-reflected.
+
+    Used as a probe; the return value doesn't gate training because the C++
+    bridge takes the direct GeomModel path regardless.
+    """
+    return getattr(unreal, "MLDeformerTrainingDataProcessorAnim", None) is not None
+
+
 def _snapshot_network_files(project_dir: Path) -> Dict[str, float]:
     suffixes = (".nmn", ".ubnne")
     roots = [project_dir / "Intermediate", project_dir / "Saved", project_dir / "Content"]
@@ -239,6 +270,11 @@ def main() -> int:
         determinism = _resolve_determinism(cfg)
         applied_env = _apply_determinism_env(determinism)
 
+        # Phase 3.2 probe — record whether FMLDeformerTrainingDataProcessorAnim
+        # is Python-reflected in this engine version.  Training proceeds via the
+        # C++ bridge regardless; this value is informational only.
+        training_processor_api_present = _check_training_processor_api()
+
         results: List[Dict[str, Any]] = []
         errors: List[Dict[str, Any]] = []
 
@@ -308,6 +344,7 @@ def main() -> int:
                 "trained_count": len([r for r in results if r.get("success")]),
                 "failed_count": len(errors),
                 "determinism": determinism,
+                "training_processor_api_present": training_processor_api_present,
                 "train_determinism_report": str((run_dir / "reports" / "train_determinism_report.json").resolve()),
             },
             errors=errors,

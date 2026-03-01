@@ -828,6 +828,40 @@ namespace
 				OutWarnings.Add(TEXT("Override skipped: mode"));
 			}
 
+			// Phase 2.2: EMLDeformerSkinningMode (new in UE5.7, defined in MLDeformerModel.h).
+			// Config key "skinning_mode": "linear" | "dual_quaternion"
+			// Default in UE5.7 is Linear, same as UE5.5 implicit behaviour.
+			// Only set if explicitly provided so training data trained with LBS
+			// continues to use Linear unless the user opts in to DualQuaternion.
+			FString SkinningModeString;
+			if (JsonFieldToString(Overrides, TEXT("skinning_mode"), SkinningModeString) &&
+				!SetEnumPropertyByName(NMM, TEXT("SkinningMode"), SkinningModeString))
+			{
+				OutWarnings.Add(TEXT("Override skipped: skinning_mode (unsupported enum value or missing property)"));
+			}
+
+			// Phase 2.1: bone_mask_info_map / bone_group_mask_info_map
+			// These are TMap<FName, FMLDeformerMaskInfo> properties.  Full struct
+			// serialisation is non-trivial; warn and skip so the caller knows the
+			// key was recognised but not applied.  Clients that need to set masks
+			// should do so through the asset editor or a dedicated script step.
+			static const TCHAR* MaskMapKeys[] = {
+				TEXT("bone_mask_info_map"),
+				TEXT("bone_group_mask_info_map"),
+			};
+			for (const TCHAR* MaskKey : MaskMapKeys)
+			{
+				if (Overrides->HasField(MaskKey))
+				{
+					OutWarnings.Add(FString::Printf(
+						TEXT("Override '%s' recognised but not applied: "
+							 "TMap<FName,FMLDeformerMaskInfo> serialisation is "
+							 "not yet supported via model_overrides_json.  "
+							 "Set masks through the asset editor."),
+						MaskKey));
+				}
+			}
+
 			SetIfInt(NMM, TEXT("local_num_morph_targets_per_bone"), TEXT("LocalNumMorphTargetsPerBone"));
 			SetIfInt(NMM, TEXT("global_num_morph_targets"), TEXT("GlobalNumMorphTargets"));
 			SetIfInt(NMM, TEXT("local_num_hidden_layers"), TEXT("LocalNumHiddenLayers"));
@@ -960,6 +994,19 @@ namespace
 		}
 
 		NNM->RemoveAllSections();
+		// Phase 2.3 audit (UE5.5 → UE5.7) — UNearestNeighborModelSection property names:
+		//   NeighborPoses   — UPROPERTY: unchanged ✅  (NearestNeighborModel.h L209)
+		//   NeighborMeshes  — UPROPERTY: unchanged ✅  (NearestNeighborModel.h L213)
+		//   ExcludedFrames  — UPROPERTY: unchanged ✅  (NearestNeighborModel.h L237)
+		//   NumBasis        — set via SetNumBasis() from JSON key "num_pca_coeffs": unchanged ✅
+		//   WeightMapCreationMethod / BoneNames / AttributeName — NEW in UE5.7; not yet
+		//     surfaced in pipeline config.  Left at UObject defaults (ManualVertexMap /
+		//     empty list / "") which preserves existing behaviour.
+		// Phase 2.4 audit — GetNumMorphTargets(int32 LOD) (UE5.7 replaces no-arg overload):
+		//   UNeuralMorphModel::GetNumMorphTargets() with no args is UE_DEPRECATED(5.4).
+		//   This bridge does NOT call it anywhere; all morph count queries go through the
+		//   editor model's UpdateNetworkOutputDim() path, which uses the LOD-aware form
+		//   internally.  No call-site change required here.
 		for (int32 Index = 0; Index < JsonArray.Num(); ++Index)
 		{
 			const TSharedPtr<FJsonValue>& ItemValue = JsonArray[Index];

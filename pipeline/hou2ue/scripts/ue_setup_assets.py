@@ -16,6 +16,35 @@ _THIS_DIR = Path(__file__).resolve().parent
 if str(_THIS_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR))
 
+# UE5.7 model_overrides key rename table.
+# BoneMaskInfos / BoneGroupMaskInfos were renamed in UE5.5→5.7:
+#   BoneMaskInfos       (TMap<FName,FNeuralMorphMaskInfo>)
+#     → BoneMaskInfoMap  (TMap<FName,FMLDeformerMaskInfo>)
+#   BoneGroupMaskInfos  (TMap<FName,FNeuralMorphMaskInfo>)
+#     → BoneGroupMaskInfoMap (TMap<FName,FMLDeformerMaskInfo>)
+# See: NeuralMorphModel.h lines 113–138 (UE_DEPRECATED 5.5 annotation).
+_UE57_MODEL_OVERRIDE_KEY_RENAME: Dict[str, str] = {
+    "bone_mask_infos": "bone_mask_info_map",
+    "bone_group_mask_infos": "bone_group_mask_info_map",
+}
+
+
+def _normalize_model_overrides_for_ue57(overrides: Dict[str, Any]) -> Dict[str, Any]:
+    """Rename deprecated UE5.5 model_overrides keys to their UE5.7 equivalents.
+
+    This is a no-op for keys that are already correct.  The C++ bridge
+    (ApplyModelOverrides) matches on the renamed keys, so callers can write
+    either the old or new key name in their YAML config.
+    """
+    if not overrides:
+        return overrides
+    result: Dict[str, Any] = {}
+    for key, value in overrides.items():
+        normalized = _UE57_MODEL_OVERRIDE_KEY_RENAME.get(key, key)
+        result[normalized] = value
+    return result
+
+
 from ue_common import (
     apply_template,
     asset_exists,
@@ -346,7 +375,9 @@ def _build_setup_request(
     deformer_graph = str(cfg.get("deformer_graph", "") or "")
     test_anim_sequence = str(cfg.get("test_anim_sequence", "") or "")
     raw_overrides = cfg.get("model_overrides", {})
-    model_overrides = dict(raw_overrides) if isinstance(raw_overrides, dict) else {}
+    model_overrides = _normalize_model_overrides_for_ue57(
+        dict(raw_overrides) if isinstance(raw_overrides, dict) else {}
+    )
 
     # When training_data_source=="pipeline", the GeomCache frame count may differ
     # from the Houdini pose_map sample count (FBX exports use their own frame_end).
