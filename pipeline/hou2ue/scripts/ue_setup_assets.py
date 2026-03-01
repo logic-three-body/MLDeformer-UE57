@@ -489,8 +489,9 @@ def main() -> int:
         assets_cfg = require_nested(cfg, ("ue", "deformer_assets"))
         ordered_keys = list(require_nested(cfg, ("ue", "training_order")))
         baseline_cfg = cfg.get("reference_baseline", {}) if isinstance(cfg.get("reference_baseline"), dict) else {}
+        baseline_enabled = bool(baseline_cfg.get("enabled", True))
         strict_clone_cfg = baseline_cfg.get("strict_clone", {}) if isinstance(baseline_cfg.get("strict_clone"), dict) else {}
-        strict_clone_enabled = bool(strict_clone_cfg.get("enabled", False))
+        strict_clone_enabled = bool(strict_clone_cfg.get("enabled", False)) and baseline_enabled
         strict_clone_source = str(strict_clone_cfg.get("source", "") or "").strip().lower()
 
         training_cfg = cfg.get("ue", {}).get("training", {}) if isinstance(cfg.get("ue"), dict) else {}
