@@ -254,6 +254,7 @@ class Hou2UeDemoRuntimeExecutor(unreal.MoviePipelinePythonHostExecutor):
             frame_end_raw = str(_param_lookup(cmd_params, "DemoEndFrame", required=False, default="")).strip()
             zero_pad = int(_param_lookup(cmd_params, "DemoZeroPad", required=False, default="4"))
             self.warmup_frames = int(_param_lookup(cmd_params, "DemoWarmupFrames", required=False, default="0"))
+            self.demo_render_mode = str(_param_lookup(cmd_params, "DemoRenderMode", required=False, default="lit")).lower()
 
             output_dir = Path(self.demo_output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -296,6 +297,23 @@ class Hou2UeDemoRuntimeExecutor(unreal.MoviePipelinePythonHostExecutor):
                 _set_prop_safe(aa, "render_warm_up_count", int(self.warmup_frames))
 
             config.find_or_add_setting_by_class(unreal.MoviePipelineDeferredPassBase)
+            if self.demo_render_mode == "basecolor":
+                # Disable all lighting / GI / post-process effects so the rendered output
+                # is BaseColor (unlit albedo) only. This eliminates Lumen GI cold-start
+                # variance and makes reference vs source comparisons Lumen-agnostic.
+                cvars = config.find_or_add_setting_by_class(unreal.MoviePipelineConsoleVariableSetting)
+                _set_prop_safe(cvars, "console_variables", {
+                    "showflag.Lighting": 0.0,
+                    "showflag.GlobalIllumination": 0.0,
+                    "showflag.ReflectionEnvironment": 0.0,
+                    "showflag.AmbientOcclusion": 0.0,
+                    "showflag.Bloom": 0.0,
+                    "showflag.LensFlares": 0.0,
+                    "showflag.EyeAdaptation": 0.0,
+                    "showflag.ScreenSpaceReflections": 0.0,
+                    "showflag.ContactShadows": 0.0,
+                })
+                unreal.log("[hou2ue] BaseColor render mode: lighting showflags disabled")
             config.find_or_add_setting_by_class(unreal.MoviePipelineImageSequenceOutput_PNG)
             config.initialize_transient_settings()
 
