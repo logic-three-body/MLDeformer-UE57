@@ -110,7 +110,7 @@
 | T1 | ArtSource 核验：`.hip`、FBX 训练动画、Rest caches、部分 PDG 输出均存在 | ✅ | `simRoot/Mio_muscle_setup.hip` + `outputFiles/PDG_sim_MM_OLD_*/`（tissue_sim 完整，mesh partial）；`reuse_existing_outputs:true` + `allow_sample_padding:true` 可填充至 20 帧 |
 | T2 | `skip_train: false`（已改）| ✅ | `pipeline.full_exec.yaml` |
 | T3 | `training_data_source: "pipeline"`（已改）| ✅ | 同上 |
-| T4 | 执行训练阶段：`ue_setup` + `train`（NMM flesh `num_iterations=2000`） | ⚠️ 执行中（20260301_162455_smoke） | 多次 D3D12 / TDR crash；TdrDelay=300 已写入注册表但需重启激活。flesh 训练目标 ssim_mean≥0.88（F470–490）；最终需全量3模型（flesh+upper_costume+lower_costume）|
+| T4 | 执行训练阶段：`ue_setup` + `train`（NMM flesh `num_iterations=2000`） | ⚠️ 执行中（20260301_162455_smoke） | **MemoryError 根因**：`morph_helpers.py` 中 `.tolist()` 一次性分配 ~2.5 GB Python 列表（46M floats × 56字节）→ 已打补丁为分块（500K/chunk）。上/下装 NNM 已训练✅；flesh NMM 重训中。`pipeline.full_exec.yaml` 已更新：`warmup_frames=100`、`static_reference_frames_dir` 指向 UE5.7 验证帧。|
 | T5 | 检查 `train_report.json`：3 个模型均 success，`.nmn` / `.ubnne` 路径有效 | ⬜ | 训练完成后验证 |
 | T6 | `gt_compare_report.json`：全局 SSIM ≥ 0.92，F470–490 SSIM ≥ 0.88，EdgeIoU ≥ 0.92 | ⬜ | 训练后 GT 对比验证 |
 | T7 | 达标后将 `ssim_mean_min` 由 0.80 提升至 0.90，移除 `debug_mode: true` | ⬜ | Phase V 验证通过后修改 |

@@ -75,6 +75,42 @@ If the project's `Content/Python/` directory contains any `training_*.py` or
 
 ---
 
+## Patched Engine Files
+
+> ⚠️ These engine Python files have been **modified in-place** on this workstation.
+> Re-check after any UE5.7 engine update (launcher repair or reinstall will overwrite).
+
+### `morph_helpers.py` — chunked `.tolist()` fix (2026-03-01)
+
+**Problem**: `extract_morph_targets()` called `.tolist()` on the full flattened morph
+target matrix in one shot. For Emil's flesh body (~60k verts × 256 modes × 3 floats
+= 46M elements), Python's `.tolist()` requires ~56 bytes per float → ~2.5 GB peak
+memory, causing `MemoryError` during NMM post-training extraction.
+
+**Symptom in `train_report.json`**:
+```
+MemoryError in morph_helpers.py line 45:
+    deltas.extend(morph_target_matrix.T.flatten().cpu().detach().numpy().tolist())
+```
+
+**Fix applied**: replaced single `.tolist()` call with chunked iteration (500 000
+elements per chunk, ~28 MB peak per chunk):
+```python
+_arr = morph_target_matrix.T.flatten().cpu().detach().numpy()
+_CHUNK = 500_000
+for _s in range(0, len(_arr), _CHUNK):
+    deltas.extend(_arr[_s:_s + _CHUNK].tolist())
+del _arr
+```
+
+**Affected file**:
+```
+D:\Program Files\Epic Games\UE_5.7\Engine\Plugins\Animation\MLDeformer\
+  MLDeformerFramework\Content\Python\mldeformer\morph_helpers.py
+```
+
+---
+
 ## Notes on `FMLDeformerTrainingDataProcessorAnim` (Phase 3.2)
 
 UE5.7 introduced `FMLDeformerTrainingDataProcessorAnim` as a struct that wraps

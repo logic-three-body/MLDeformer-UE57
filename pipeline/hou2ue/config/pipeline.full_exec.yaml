@@ -373,10 +373,10 @@
                                                     "height":  720,
                                                     "output_format":  "png",
                                                     "frame_window":  "full_sequence",
-                                                    "warmup_frames":  16,
+                                                    "warmup_frames":  100,
                                                     "use_reference_project":  false,
                                                     "reference_uproject":  "Refference/MLDeformerSample.uproject",
-                                                    "static_reference_frames_dir":  "D:/UE/Unreal Projects/MLDeformerSample/pipeline/hou2ue/workspace/runs/20260226_170226_smoke/workspace/staging/smoke/gt/reference/frames"
+                                                    "static_reference_frames_dir":  "D:/UE/Unreal Projects/MLDeformerSample/UE57/pipeline/hou2ue/workspace/runs/20260226_200951_smoke/workspace/staging/smoke/gt/reference/frames"
                                                 },
                                     "compare":  {
                                                     "metrics_profile":  "strict",
