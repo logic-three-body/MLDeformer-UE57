@@ -112,6 +112,7 @@ def _run_guarded_process(
     last_sizes = (0, 0)
     abort_reason = ""
     repeated_error_line = ""
+    last_heartbeat = start
 
     with stdout_path.open("w", encoding="utf-8", errors="ignore") as out_handle, stderr_path.open("w", encoding="utf-8", errors="ignore") as err_handle:
         proc = subprocess.Popen(cmd, stdout=out_handle, stderr=err_handle)
@@ -124,6 +125,18 @@ def _run_guarded_process(
             if (std_size, err_size) != last_sizes:
                 last_sizes = (std_size, err_size)
                 last_activity = time.monotonic()
+
+            # Heartbeat: print progress every 30 s so the outer guard (run_all.ps1)
+            # sees stdout activity and doesn't kill this process prematurely.
+            now = time.monotonic()
+            if now - last_heartbeat >= 30.0:
+                elapsed_min = (now - start) / 60.0
+                print(
+                    f"[ue_capture] ue process running, elapsed={elapsed_min:.1f}min,"
+                    f" stdout_size={std_size}, stderr_size={err_size}",
+                    flush=True,
+                )
+                last_heartbeat = now
 
             line, count = _detect_repeated_error_line([stdout_path, stderr_path], repeated_error_threshold)
             if line:
