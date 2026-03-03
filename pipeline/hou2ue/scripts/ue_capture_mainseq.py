@@ -274,6 +274,7 @@ def main() -> int:
         height = int(capture_cfg.get("height", 720))
         frame_window = str(capture_cfg.get("frame_window", "full_sequence") or "full_sequence")
         warmup_frames = int(capture_cfg.get("warmup_frames", 0))
+        render_mode = str(capture_cfg.get("render_mode", "lit") or "lit").lower()
 
         # ── UE57 static reference frames bypass ───────────────────────────────
         # When ue.ground_truth.capture.static_reference_frames_dir is set and
@@ -470,6 +471,7 @@ def main() -> int:
             f"-DemoResX={width}",
             f"-DemoResY={height}",
             f"-DemoWarmupFrames={warmup_frames}",
+            f"-DemoRenderMode={render_mode}",
             f"-DemoReportJson={report_json}",
             "-NoLoadingScreen",
             "-NoSound",
