@@ -380,8 +380,8 @@
                                                     "warmup_frames":  100,
                                                     "use_reference_project":  true,
                                                     "reference_uproject":  "Refference/MLDeformerSample.uproject",
-                                                    "static_reference_frames_dir":  "D:/UE/Unreal Projects/MLDeformerSample/UE57/pipeline/hou2ue/workspace/runs/20260226_200951_smoke/workspace/staging/smoke/gt/reference/frames",
-                                                    "static_source_frames_dir":  "D:/UE/Unreal Projects/MLDeformerSample/UE57/pipeline/hou2ue/workspace/runs/20260226_200951_smoke/workspace/staging/smoke/gt/source/frames",
+                                                    "static_reference_frames_dir":  "",
+                                                    "static_source_frames_dir":  "",
                                                     "render_mode":  "basecolor"
                                                 },
                                     "compare":  {

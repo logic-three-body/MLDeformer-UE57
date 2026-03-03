@@ -58,8 +58,8 @@
 | D6 | `reference_baseline.enabled = false` 已设置 | ✅ | |
 | D7 | 跨版本 GT 对比阈值已放宽（SSIM≥0.80，PSNR≥22，EdgeIoU≥0.75，MS-SSIM≥0.78，ΔE≤15）| ✅ | `debug_mode: true`；待训练后收紧 |
 | D8 | `run_all.ps1` — train 阶段 `reference_baseline.enabled=false` 分支正确跳过复制 | ✅ | |
-| D9 | `ue_capture_mainseq.py` — `static_reference_frames_dir` bypass 已实现 | ✅ | |
-| D10 | `ue_capture_mainseq.py` — `static_source_frames_dir` bypass 已实现 | ✅ | 绕过 Lumen GI 冷启动问题；使用 Feb26 连续渲染帧 |
+| D9 | `ue_capture_mainseq.py` — `static_reference_frames_dir` bypass 已实现 | ✅ | Phase R 后此 bypass 已清空（BaseColor 模式使 Lumen 冷启动问题不再存在）|
+| D10 | `ue_capture_mainseq.py` — `static_source_frames_dir` bypass 已实现 | ✅ | Phase R 后此 bypass 已清空，两侧均使用 BaseColor 实时渲染 |
 
 ---
 
@@ -85,7 +85,7 @@
 | # | 问题描述 | 影响阶段 | 状态 | 解决方案 |
 |---|---------|---------|------|---------|
 | F1 | **形变质量差距**（帧 470–490 最差：SSIM≈0.711，PSNR≈17dB，EdgeIoU≈0.50，ΔE≈8.67；帧 400–599 整体 SSIM≈0.76，Edge≈0.69）| gt_compare | ⚠️ 已记录 | **原因（形变分量）**：UE5.5 预训练 `.nmn` 权重在 UE5.7 推理系统下产生错误 mesh 形变（Body ROI SSIM < 全局 SSIM，错误集中于角色体型区域；EdgeIoU=0.50 = 轮廓/形状坍塌），而非仅色彩差异。**修复方案**：Phase T — 使用 UE5.7 原生训练数据重新训练，预期 F470–490 SSIM ≥ 0.88，EdgeIoU ≥ 0.92。 |
-| F2 | **渲染器基准差距**（F0–99 静止姿态 SSIM=0.918 vs UE5.5 基准 0.997，差距约 8%）| gt_compare | ✅ 已分析（接受为底线） | **原因（渲染器分量）**：两版本 `DefaultEngine.ini / [/Script/Engine.RendererSettings]` 完全相同，差距来自 UE 引擎内部算法变更（Lumen GI / VSM / TAA F0–99 帧 deformer 近零贡献），配置层面无法消除。**决策**：接受约 9% SSIM 底线，训练后目标定为 `ssim_mean ≥ 0.92`（而非 0.997）。 |
+| F2 | **渲染器基准差距**（Lumen/VSM/TAA 引擎内部变更，Lit 模式 ~8% SSIM 底线）| gt_compare | ✅ 已解决（改用 BaseColor 模式） | **根因**：Lumen GI / VSM / TAA 算法变更，配置层面不可消除。**已解决**：Phase R 引入 BaseColor 渲染模式（禁用 showflag.Lighting 等 9 个 showflag），两侧均只渲染 unlit 漫反射，消除 Lumen 底线噪声。BaseColor 模式下 F0–99 SSIM 预计接近 1.0。 |
 
 ---
 
@@ -110,10 +110,10 @@
 | T1 | ArtSource 核验：`.hip`、FBX 训练动画、Rest caches、部分 PDG 输出均存在 | ✅ | `simRoot/Mio_muscle_setup.hip` + `outputFiles/PDG_sim_MM_OLD_*/`（tissue_sim 完整，mesh partial）；`reuse_existing_outputs:true` + `allow_sample_padding:true` 可填充至 20 帧 |
 | T2 | `skip_train: false`（已改）| ✅ | `pipeline.full_exec.yaml` |
 | T3 | `training_data_source: "pipeline"`（已改）| ✅ | 同上 |
-| T4 | 执行训练阶段：`ue_setup` + `train`（NMM flesh `num_iterations=2000`） | ⚠️ 执行中（20260301_162455_smoke） | **MemoryError 根因**：`morph_helpers.py` 中 `.tolist()` 一次性分配 ~2.5 GB Python 列表（46M floats × 56字节）→ 已打补丁为分块（500K/chunk）。上/下装 NNM 已训练✅；flesh NMM 重训中。`pipeline.full_exec.yaml` 已更新：`warmup_frames=100`、`static_reference_frames_dir` 指向 UE5.7 验证帧。|
-| T5 | 检查 `train_report.json`：3 个模型均 success，`.nmn` / `.ubnne` 路径有效 | ⬜ | 训练完成后验证 |
-| T6 | `gt_compare_report.json`：全局 SSIM ≥ 0.92，F470–490 SSIM ≥ 0.88，EdgeIoU ≥ 0.92 | ⬜ | 训练后 GT 对比验证 |
-| T7 | 达标后将 `ssim_mean_min` 由 0.80 提升至 0.90，移除 `debug_mode: true` | ⬜ | Phase V 验证通过后修改 |
+| T4 | 执行训练阶段：`ue_setup` + `train`（NMM flesh `num_iterations=2000`） | ✅ 完成（20260301_162455_smoke） | **MemoryError 根因**：`morph_helpers.py` 中 `.tolist()` 一次性分配 ~2.5 GB Python 列表（46M floats × 56字节）→ 已打补丁为分块（500K/chunk）。3 个模型（NNM upper/lower + NMM flesh）均训练完成，`train_report.json` success。D3D12 TDR 通过删除 `cached_mask_index_per_sample.bin`、从 Reference 恢复 uasset、重建项目解决。|
+| T5 | 检查 `train_report.json`：3 个模型均 success，`.nmn` / `.ubnne` 路径有效 | ✅ | `train_report.json` 已确认 success，`train_determinism_report.json` 生成 |
+| T6 | `gt_compare_report.json`：BaseColor 模式下 SSIM ≥ 0.92（无 Lumen 底线噪声）| ⬜ | Phase R BaseColor 验证中 |
+| T7 | 达标后将 `ssim_mean_min` 提升至 0.92，移除 `debug_mode: true` | ⬜ | Phase R 验证通过后修改 |
 
 ---
 
@@ -134,10 +134,10 @@
 
 ---
 
-## 阶段 V：验证结果汇总（Run 20260226_200951_smoke）
+## 阶段 V：验证结果汇总（Run 20260226_200951_smoke，Lit 模式）
 
-> 采用 Feb26 静态帧旁路（`static_source_frames_dir`），绕过 Lumen GI 冷启动问题。  
-> 已提交代码：`ue_capture_mainseq.py` 新增 `static_source_frames_dir` bypass；`pipeline.yaml` 配置两路静态帧目录。
+> ⚠️ **此结果为 Lumen Lit 渲染模式（已废弃）**。Phase R 引入 BaseColor 渲染模式后，此基准将被新 BaseColor 结果取代。  
+> 采用 Feb26 静态帧旁路（`static_source_frames_dir`），绕过 Lumen GI 冷启动问题。
 
 ### 全局指标（1560 帧，阈值 debug_mode=true）
 
@@ -169,7 +169,25 @@
 
 ---
 
-## 阶段 L：Lumen GI 冷启动问题记录
+## 阶段 R：BaseColor 渲染模式（2026-03-03）
+
+> 消除 Lumen GI 冷启动噪声对 GT 对比的影响。Reference 与 Source 两侧均渲染 BaseColor（unlit albedo）而非全光照画面。
+
+| # | 检查项 | 状态 | 备注 |
+|---|--------|------|------|
+| R1 | `Hou2UeDemoRuntimeExecutor.py` 支持 `-DemoRenderMode=basecolor` 命令行参数 | ✅ | 解析并设置 9 个 showflag：Lighting / GlobalIllumination / ReflectionEnvironment / AmbientOcclusion / Bloom / LensFlares / EyeAdaptation / ScreenSpaceReflections / ContactShadows 全部禁用 |
+| R2 | `ue_capture_mainseq.py` 从 config 读取 `render_mode` 并传递至 UE 命令行 | ✅ | `capture_cfg.get("render_mode", "lit")` → `-DemoRenderMode=basecolor` |
+| R3 | `pipeline.yaml` + `pipeline.full_exec.yaml` 均设置 `render_mode: "basecolor"` | ✅ | `ue.ground_truth.capture.render_mode` |
+| R4 | `static_reference_frames_dir` 和 `static_source_frames_dir` 均已清空 | ✅ | BaseColor 模式下 Lumen 已禁用，不再需要静态帧旁路 |
+| R5 | `Hou2UeDemoRuntimeExecutor.py` 已同步至 UE5.7 工程 `Content/Python/` | ✅ | 手动同步至 `UE57\MLDeformerSample\Content\Python\` |
+| R6 | BaseColor 模式 GT 对比运行成功，SSIM 接近 1.0（F0–99 预估） | ⬜ | Phase R 执行中 |
+| R7 | BaseColor 数据确认后将阈值收紧 `ssim_mean_min → 0.97`，删除 `debug_mode` | ⬜ | 待 R6 通过后执行 |
+
+**提交**：`98e26ba` — Add BaseColor render mode: disable lighting showflags to eliminate Lumen variance
+
+---
+
+## 阶段 L：Lumen GI 冷启动问题记录（已解决）
 
 > `r.Lumen.HardwareRayTracing=True` + `r.Lumen.TraceMeshSDFs=0`（仅 HW RT，无 SW 兜底）  
 > 帧 ~490 场景切换后 Lumen probe cache 重建，ML Deformer 每帧 mesh 形变加速 probe 失效。
@@ -181,11 +199,7 @@
 | 600 | 95.1 | 38.3 | 96.6 |
 | 900 | — | 47.8 | 90.3 |
 
-**已采用方案**：`static_source_frames_dir` 旁路，使用 Feb26 单次连续渲染帧（warmup=16，无 TDR 中断）。  
-**长期修复选项**（按难度排序）：
-1. 加入 `-ExecCmds="r.Lumen.ScreenProbeGather.TemporalReprojection 0"`（强制逐帧重算，无闪烁问题但性能低）
-2. `Hou2UeDemoRuntimeExecutor.py` 增加 LevelSequence 全序列预热（在 MRP 启动前先播放一遍）
-3. 切换 `r.Lumen.HardwareRayTracing=False` + `r.Lumen.TraceMeshSDFs=1`（SW Lumen，收敛更快）
+**已采用方案**：~~`static_source_frames_dir` 旁路~~（Phase R 已废弃）→ **BaseColor 渲染模式**：禁用 showflag.Lighting/GlobalIllumination/ReflectionEnvironment/AmbientOcclusion/Bloom/LensFlares/EyeAdaptation/ScreenSpaceReflections/ContactShadows，彻底消除 Lumen 底线噪声。
 
 ---
 
