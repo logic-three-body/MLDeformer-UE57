@@ -57,7 +57,7 @@ function Get-StageTimeoutMinutes([string]$StageName) {
         "train" { return 240 }
         "infer" { return 240 }
         "gt_reference_capture" { return 240 }
-        "gt_source_capture" { return 240 }
+        "gt_source_capture" { return 720 }
         "gt_compare" { return 60 }
         "report" { return 30 }
         default { return 120 }
@@ -314,7 +314,8 @@ function Invoke-PythonScript(
 
 function Invoke-UnrealPythonScript(
     [string]$ScriptPath,
-    [hashtable]$EnvOverrides = @{}
+    [hashtable]$EnvOverrides = @{},
+    [string[]]$ExtraUEArgs = @()
 ) {
     $oldConfig = $env:HOU2UE_CONFIG
     $oldProfile = $env:HOU2UE_PROFILE
@@ -345,7 +346,7 @@ function Invoke-UnrealPythonScript(
             "-NoSound",
             "-stdout",
             "-FullStdOutLogOutput"
-        )
+        ) + $ExtraUEArgs
 
         $scriptFile = [System.IO.Path]::GetFileName($ScriptPath)
         $reportStage = switch ($scriptFile) {
@@ -574,7 +575,7 @@ function Run-Stage([string]$StageName) {
                 $setupReport | Set-Content -Encoding UTF8 (Join-Path (Join-Path $ResolvedRunDir "reports") "ue_setup_report.json")
             }
             else {
-                Invoke-UnrealPythonScript -ScriptPath $ueSetupScript
+                Invoke-UnrealPythonScript -ScriptPath $ueSetupScript -ExtraUEArgs @("-nullrhi")
             }
         }
         "train" {
@@ -682,7 +683,7 @@ function Run-Stage([string]$StageName) {
                     "HOU2UE_CUDNN_DETERMINISTIC" = $(if ($cudnnDeterministic) { "1" } else { "0" })
                     "HOU2UE_CUDNN_BENCHMARK" = $(if ($cudnnBenchmark) { "1" } else { "0" })
                 }
-                Invoke-UnrealPythonScript -ScriptPath $ueTrainScript -EnvOverrides $envOverrides
+                Invoke-UnrealPythonScript -ScriptPath $ueTrainScript -EnvOverrides $envOverrides -ExtraUEArgs @("-nullrhi")
             }
         }
         "infer" {

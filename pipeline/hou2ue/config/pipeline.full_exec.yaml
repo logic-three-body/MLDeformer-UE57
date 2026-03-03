@@ -242,7 +242,7 @@
                                                                               ],
                                                      "test_anim_sequence":  "/Game/Characters/Emil/Animation/Test/Emil_box_in_place_test",
                                                      "model_overrides":  {
-
+                                                                             "num_iterations":  2000
                                                                          }
                                                  },
                                        "upper_costume":  {
@@ -331,9 +331,7 @@
                                                          }
                                    },
                "training_order":  [
-                                      "flesh",
-                                      "upper_costume",
-                                      "lower_costume"
+                                      "flesh"
                                   ],
                "training":  {
                                 "skip_train":  false,

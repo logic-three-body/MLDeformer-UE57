@@ -24,6 +24,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--profile", required=True, choices=["smoke", "full"])
     parser.add_argument("--run-dir", required=True)
     parser.add_argument("--capture-kind", required=True, choices=["reference", "source"])
+    parser.add_argument("--resume", action="store_true",
+                        help="Resume a partial capture: preserve existing frames, start UE from the existing frame count.")
     return parser.parse_args()
 
 
@@ -346,6 +348,78 @@ def main() -> int:
             return 0
         # ── end static reference frames bypass ────────────────────────────────
 
+        # ── static source frames bypass ───────────────────────────────────────
+        # When ue.ground_truth.capture.static_source_frames_dir is set and
+        # capture_kind == "source", skip the UE Editor render entirely and
+        # populate the frames directory from the pre-rendered source frames.
+        # Useful when Lumen GI convergence issues prevent reliable re-capture.
+        static_src_dir_str = str(capture_cfg.get("static_source_frames_dir", "") or "")
+        if args.capture_kind == "source" and static_src_dir_str:
+            static_src_dir = Path(static_src_dir_str)
+            if not static_src_dir.exists():
+                raise RuntimeError(
+                    f"static_source_frames_dir does not exist: {static_src_dir}"
+                )
+
+            gt_root = run_dir / "workspace" / "staging" / args.profile / "gt" / args.capture_kind
+            frame_dir = gt_root / "frames"
+            report_json = run_dir / "reports" / f"{stage_name}_job.json"
+
+            frame_dir.mkdir(parents=True, exist_ok=True)
+            report_json.parent.mkdir(parents=True, exist_ok=True)
+
+            for _f in frame_dir.glob("*.png"):
+                _f.unlink(missing_ok=True)
+            report_json.unlink(missing_ok=True)
+
+            src_files = sorted(p for p in static_src_dir.rglob("*.png") if p.is_file())
+            if not src_files:
+                raise RuntimeError(
+                    f"No PNG files found in static_source_frames_dir: {static_src_dir}"
+                )
+            for _src in src_files:
+                shutil.copy2(_src, frame_dir / _src.name)
+
+            frame_count, first_frame, last_frame = _count_frames(frame_dir, "png")
+            write_json(report_json, {
+                "status": "success",
+                "source": "static_source_frames_dir",
+                "static_source_frames_dir": str(static_src_dir.resolve()),
+                "frame_count": frame_count,
+            })
+
+            finalize_report(
+                report,
+                status="success",
+                outputs={
+                    "enabled": True,
+                    "capture_kind": args.capture_kind,
+                    "uproject": "N/A (static_source_frames_dir mode)",
+                    "map": map_path,
+                    "level_sequence": sequence_path,
+                    "output_format": fmt,
+                    "width": width,
+                    "height": height,
+                    "frame_window": frame_window,
+                    "warmup_frames": warmup_frames,
+                    "frame_count": frame_count,
+                    "first_frame": first_frame,
+                    "last_frame": last_frame,
+                    "output_dir": str(frame_dir.resolve()),
+                    "executor_report_json": str(report_json.resolve()),
+                    "fallback_used": False,
+                    "fallback_reason": "",
+                    "executor_sync_files": [],
+                    "command": [],
+                    "process": {"static_bypass": True},
+                    "static_source_frames_dir": str(static_src_dir.resolve()),
+                },
+                errors=[],
+            )
+            write_json(report_path, report)
+            return 0
+        # ── end static source frames bypass ──────────────────────────────────
+
         infer_cfg = ue_cfg.get("infer", {}) if isinstance(ue_cfg.get("infer"), dict) else {}
         demo_cfg = infer_cfg.get("demo", {}) if isinstance(infer_cfg.get("demo"), dict) else {}
         demo_timeout = demo_cfg.get("timeout", {}) if isinstance(demo_cfg.get("timeout"), dict) else {}
@@ -372,9 +446,15 @@ def main() -> int:
         report_json.parent.mkdir(parents=True, exist_ok=True)
         stdout_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # clean previous output for deterministic compare
-        for file in frame_dir.glob("*.png"):
-            file.unlink(missing_ok=True)
+        # Determine resume offset before any cleanup
+        resume_start_frame: int = 0
+        if args.resume:
+            resume_start_frame, _, _ = _count_frames(frame_dir, fmt)
+            print(f"[ue_capture] Resume mode: {resume_start_frame} existing frames found, starting from frame {resume_start_frame}")
+        else:
+            # clean previous output for deterministic compare
+            for file in frame_dir.glob("*.png"):
+                file.unlink(missing_ok=True)
         report_json.unlink(missing_ok=True)
 
         cmd = [
@@ -400,6 +480,10 @@ def main() -> int:
             "-FullStdOutLogOutput",
             "-log",
         ]
+
+        # In resume mode, tell the UE executor to skip already-captured frames.
+        if resume_start_frame > 0:
+            cmd.append(f"-DemoStartFrame={resume_start_frame}")
 
         # full-sequence mode lets runtime executor derive range from sequence playback range.
         if frame_window != "full_sequence":

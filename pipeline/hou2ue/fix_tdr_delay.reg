@@ -1,0 +1,15 @@
+Windows Registry Editor Version 5.00
+
+; Fix for GPU TDR crash during gt_source_capture with flesh NMM active.
+; Flesh NMM with 1129 morphs x 111769 verts causes 7-24s per frame.
+; Windows TDR default is 2s - this raises it to 60s to prevent false GPU resets.
+;
+; After importing this file, restart the GPU driver:
+;   Press Win + Ctrl + Shift + B  (takes ~1 second, screen will flash briefly)
+; Then re-run:
+;   cd "D:\UE\Unreal Projects\MLDeformerSample\UE57\pipeline\hou2ue"
+;   .\run_all.ps1 -Stage gt_source_capture -Config config\pipeline.yaml
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GraphicsDrivers]
+"TdrDelay"=dword:0000003c
+"TdrDdiDelay"=dword:0000003c

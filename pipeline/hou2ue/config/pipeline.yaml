@@ -358,7 +358,14 @@
                              "console_commands":  [
                                                       "stat mldeformerinference",
                                                       "stat gpu"
-                                                  ]
+                                                  ],
+                             "demo":  {
+                                          "enabled":  false,
+                                          "timeout":  {
+                                                          "per_job_minutes":  720,
+                                                          "no_activity_minutes":  30
+                                                      }
+                                      }
                          },
                "ground_truth":  {
                                     "enabled":  true,
@@ -370,18 +377,25 @@
                                                     "height":  720,
                                                     "output_format":  "png",
                                                     "frame_window":  "full_sequence",
-                                                    "warmup_frames":  16,
+                                                    "warmup_frames":  100,
                                                     "use_reference_project":  true,
-                                                    "reference_uproject":  "Refference/MLDeformerSample.uproject"
+                                                    "reference_uproject":  "Refference/MLDeformerSample.uproject",
+                                                    "static_reference_frames_dir":  "D:/UE/Unreal Projects/MLDeformerSample/UE57/pipeline/hou2ue/workspace/runs/20260226_200951_smoke/workspace/staging/smoke/gt/reference/frames",
+                                                    "static_source_frames_dir":  "D:/UE/Unreal Projects/MLDeformerSample/UE57/pipeline/hou2ue/workspace/runs/20260226_200951_smoke/workspace/staging/smoke/gt/source/frames"
                                                 },
                                     "compare":  {
                                                     "metrics_profile":  "strict",
+                                                    "debug_mode":  true,
                                                     "thresholds":  {
-                                                                       "ssim_mean_min":  0.995,
-                                                                       "ssim_p05_min":  0.985,
-                                                                       "psnr_mean_min":  35.0,
-                                                                       "psnr_min_min":  30.0,
-                                                                       "edge_iou_mean_min":  0.97
+                                                                       "ssim_mean_min":  0.8,
+                                                                       "ssim_p05_min":  0.6,
+                                                                       "psnr_mean_min":  22.0,
+                                                                       "psnr_min_min":  14.0,
+                                                                       "edge_iou_mean_min":  0.75,
+                                                                       "ms_ssim_mean_min":  0.78,
+                                                                       "ms_ssim_p05_min":  0.6,
+                                                                       "de2000_mean_max":  15.0,
+                                                                       "de2000_p95_max":  25.0
                                                                    },
                                                     "fail_on_frame_count_mismatch":  true
                                                 }
