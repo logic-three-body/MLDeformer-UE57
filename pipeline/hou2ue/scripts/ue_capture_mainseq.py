@@ -104,8 +104,15 @@ def _run_guarded_process(
 ) -> Dict[str, Any]:
     stdout_path.parent.mkdir(parents=True, exist_ok=True)
     stderr_path.parent.mkdir(parents=True, exist_ok=True)
-    stdout_path.unlink(missing_ok=True)
-    stderr_path.unlink(missing_ok=True)
+    # Retry unlink: UE's shader compilation child processes may hold the file
+    # handle briefly after the parent UE process exits (Windows WinError 32).
+    for _log_path in (stdout_path, stderr_path):
+        for _attempt in range(8):
+            try:
+                _log_path.unlink(missing_ok=True)
+                break
+            except PermissionError:
+                time.sleep(2)
 
     start = time.monotonic()
     last_activity = start
@@ -240,7 +247,7 @@ def _ensure_runtime_executor_available(target_uproject: Path, source_project_roo
 
 def main() -> int:
     args = parse_args()
-    run_dir = Path(args.run_dir)
+    run_dir = Path(args.run_dir).resolve()  # resolve once: UE needs absolute paths for CLI flags
     stage_name = "gt_reference_capture" if args.capture_kind == "reference" else "gt_source_capture"
     report_path = stage_report_path(run_dir, stage_name)
 
