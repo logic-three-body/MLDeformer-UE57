@@ -119,6 +119,25 @@ def _thresholds_hash(thresholds: Dict[str, float]) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
+def _thresholds_violations(configured: Dict[str, float], required: Dict[str, float]) -> List[str]:
+    """Return threshold keys where *configured* is LESS strict than *required*.
+
+    For ``*_min`` thresholds a higher value is stricter (configured must be ≥ required).
+    For ``*_max`` thresholds a lower value is stricter (configured must be ≤ required).
+    Returns an empty list when all configured thresholds are at least as strict.
+    """
+    violations: List[str] = []
+    for key, req_val in required.items():
+        cfg_val = configured.get(key, 0.0)
+        if key.endswith("_max"):
+            if cfg_val > req_val:
+                violations.append(key)
+        else:
+            if cfg_val < req_val:
+                violations.append(key)
+    return violations
+
+
 def _normalize_threshold_values(raw: Dict[str, Any]) -> Dict[str, float]:
     out: Dict[str, float] = {}
     for key in _strict_thresholds().keys():
@@ -230,13 +249,20 @@ def main() -> int:
             required_thresholds = strict
             threshold_label = "strict"
 
-        if thresholds != required_thresholds and not debug_mode:
+        threshold_violations = _thresholds_violations(thresholds, required_thresholds)
+        if threshold_violations and not debug_mode:
             failures.append(
                 {
                     "stage": "gt_compare",
-                    "message": f"Ground-truth thresholds are not {threshold_label} while debug_mode is false.",
+                    "message": (
+                        f"Configured thresholds are less strict than the {threshold_label} "
+                        f"baseline on: {threshold_violations}. "
+                        f"Thresholds must be at least as strict as the {threshold_label} requirements "
+                        f"(stricter is allowed; looser is not)."
+                    ),
                     "configured_thresholds": thresholds,
                     "required_thresholds": required_thresholds,
+                    "threshold_violations": threshold_violations,
                     "training_data_source": training_data_source,
                     "configured_thresholds_hash": _thresholds_hash(thresholds),
                     "required_thresholds_hash": _thresholds_hash(required_thresholds),
