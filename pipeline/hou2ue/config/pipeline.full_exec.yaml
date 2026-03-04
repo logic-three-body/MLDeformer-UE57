@@ -381,18 +381,18 @@
                                                 },
                                     "compare":  {
                                                     "metrics_profile":  "strict",
-                                                    "debug_mode":  true,
+                                                    "debug_mode":  false,
                                                     "thresholds":  {
-                                                                       "ssim_mean_min":  0.80,
-                                                                       "ssim_p05_min":  0.60,
-                                                                       "psnr_mean_min":  22,
-                                                                       "psnr_min_min":  14,
-                                                                       "edge_iou_mean_min":  0.75,
-                                                                       "ms_ssim_mean_min":  0.78,
-                                                                       "ms_ssim_p05_min":  0.60,
-                                                                       "de2000_mean_max":  15.0,
-                                                                       "de2000_p95_max":  25.0,
-                                                                       "_thresholds_post_training_note":  "Current thresholds are relaxed (debug_mode=true) for cross-engine UE5.5->UE5.7 comparison. Renderer baseline gap ~8% SSIM (Lumen/VSM/TAA internal changes) is non-configurable. After Phase T UE5.7 native training: raise ssim_mean_min 0.80->0.90, ssim_p05_min 0.60->0.80, edge_iou_mean_min 0.75->0.90, remove debug_mode. Target: ssim_mean>=0.92, F470-490 ssim>=0.88, edge_iou>=0.92."
+                                                                       "ssim_mean_min":  0.97,
+                                                                       "ssim_p05_min":  0.92,
+                                                                       "psnr_mean_min":  40,
+                                                                       "psnr_min_min":  35,
+                                                                       "edge_iou_mean_min":  0.92,
+                                                                       "ms_ssim_mean_min":  0.995,
+                                                                       "ms_ssim_p05_min":  0.97,
+                                                                       "de2000_mean_max":  1.0,
+                                                                       "de2000_p95_max":  2.5,
+                                                                       "_thresholds_note":  "Phase S (BaseColor self-comparison, UE5.7 native). Baseline run 20260301_162455_smoke: ssim=0.9994, psnr=62.1dB, ms_ssim=0.9997, de2000=0.075, edge_iou=0.9989."
                                                                    },
                                                     "fail_on_frame_count_mismatch":  true
                                                 }

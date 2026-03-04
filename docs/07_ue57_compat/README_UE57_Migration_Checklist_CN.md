@@ -181,7 +181,7 @@
 | R4 | `static_reference_frames_dir` 和 `static_source_frames_dir` 均已清空 | ✅ | BaseColor 模式下 Lumen 已禁用，不再需要静态帧旁路 |
 | R5 | `Hou2UeDemoRuntimeExecutor.py` 已同步至 UE5.7 工程 `Content/Python/` | ✅ | 手动同步至 `UE57\MLDeformerSample\Content\Python\` |
 | R6 | BaseColor 模式 GT 对比运行成功，SSIM 接近 1.0（F0–99 预估） | ✅ | Run `20260301_162455_smoke`：SSIM=0.9995，PSNR=62.1 dB，ALL PASS |
-| R7 | BaseColor 数据确认后将阈值收紧 `ssim_mean_min → 0.97`，删除 `debug_mode` | ⬜ | R6 已通过，待独立 commit 收紧阈值 |
+| R7 | BaseColor 数据确认后将阈值收紧 `ssim_mean_min → 0.97`，删除 `debug_mode` | ✅ | 已收紧，见阶段 S |
 
 **提交**：`98e26ba` — Add BaseColor render mode: disable lighting showflags to eliminate Lumen variance
 
@@ -250,3 +250,30 @@
 - UE5.7 MLDeformer 插件：`D:\Program Files\Epic Games\UE_5.7\Engine\Plugins\Animation\MLDeformer\`
 - 已验证 UE5.5 运行：`pipeline/hou2ue/workspace/runs/20260226_170226_smoke/` (SSIM=0.9969 ALL PASS)
 - 已验证 UE5.7 跨版本运行（debug_mode）：`runs/20260226_200951_smoke/` (SSIM=0.845 ALL PASS)
+
+---
+
+## 阶段 S：阈值收紧（2026-03-04）
+
+> Phase R 全面配置已验证通过后，将对比阈值从跨引擎宽松值收紧至 BaseColor 自对比精度预期。
+
+| # | 检查项 | 状态 | 备注 |
+|---|--------|------|------|
+| S1 | `pipeline.full_exec.yaml` 阈值收紧 + `debug_mode → false` | ✅ | `ssim_mean_min 0.80→0.97`, `psnr_mean_min 22→40`, `edge_iou_mean→0.92`, `ms_ssim→0.995`, `de2000_mean_max→1.0` |
+| S2 | 使用已有帧重跑 `gt_compare` 验证新阈值通过 | ✅ | Run `20260301_162455_smoke`：ALL PASS（参见下表） |
+
+### 阶段 S 验证结果
+
+| 指标 | 实测值 | 新阈值 | 状态 |
+|------|--------|--------|------|
+| ssim_mean | 0.9995 | ≥ 0.97 | ✅ |
+| ssim_p05 | 0.9990 | ≥ 0.92 | ✅ |
+| psnr_mean | 62.1 dB | ≥ 40.0 | ✅ |
+| psnr_min | 55.7 dB | ≥ 35.0 | ✅ |
+| edge_iou_mean | 0.9990 | ≥ 0.92 | ✅ |
+| ms_ssim_mean | 0.9998 | ≥ 0.995 | ✅ |
+| ms_ssim_p05 | 0.9996 | ≥ 0.97 | ✅ |
+| de2000_mean | 0.075 | ≤ 1.0 | ✅ |
+| de2000_p95 | 0.134 | ≤ 2.5 | ✅ |
+
+**提交**：阶段 S——tighten thresholds for BaseColor self-comparison
