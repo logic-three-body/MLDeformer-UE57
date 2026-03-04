@@ -20,6 +20,30 @@ def _get_prop_safe(obj, name, default=None):
         return default
 
 
+def _disable_ml_deformer_components(world) -> int:
+    """Force all MLDeformerComponents to weight=0 via the engine CVar.
+
+    Returns 1 if the CVar was applied, 0 on failure.
+    Used during reference captures so the rendered frames represent the
+    pure skeletal (LBS/DQS) baseline without ML-Deformer corrections,
+    making reference-vs-source comparisons meaningful as quality tests.
+
+    Uses ``MLDeformer.ForceWeight 0`` (defined in MLDeformerComponent.cpp):
+    this globally overrides the weight of every MLDeformerComponent without
+    touching component activation state or GPU resources, avoiding the TDR
+    crashes caused by releasing GPU buffers mid-render.
+    """
+    if world is None:
+        return 0
+    try:
+        unreal.SystemLibrary.execute_console_command(world, "MLDeformer.ForceWeight 0")
+        unreal.log("[hou2ue] MLDeformer.ForceWeight 0 — all MLDeformer corrections suppressed for reference capture.")
+        return 1
+    except Exception as exc:
+        unreal.log_warning(f"[hou2ue] Failed to execute MLDeformer.ForceWeight 0: {exc}")
+        return 0
+
+
 def _param_lookup(params, key, required=False, default=""):
     if key in params:
         return params[key]
@@ -167,6 +191,8 @@ class Hou2UeDemoRuntimeExecutor(unreal.MoviePipelinePythonHostExecutor):
     output_res_y = unreal.uproperty(int)
     warmup_frames = unreal.uproperty(int)
     restored_sections = unreal.uproperty(int)
+    disable_ml_deformer = unreal.uproperty(bool)
+    ml_deformer_disabled_count = unreal.uproperty(int)
 
     def _post_init(self):
         self.active_movie_pipeline = None
@@ -185,6 +211,8 @@ class Hou2UeDemoRuntimeExecutor(unreal.MoviePipelinePythonHostExecutor):
         self.output_res_y = 720
         self.warmup_frames = 0
         self.restored_sections = 0
+        self.disable_ml_deformer = False
+        self.ml_deformer_disabled_count = 0
         self._animation_originals = []
 
     def _restore_swapped_animation_sections(self):
@@ -255,6 +283,9 @@ class Hou2UeDemoRuntimeExecutor(unreal.MoviePipelinePythonHostExecutor):
             zero_pad = int(_param_lookup(cmd_params, "DemoZeroPad", required=False, default="4"))
             self.warmup_frames = int(_param_lookup(cmd_params, "DemoWarmupFrames", required=False, default="0"))
             self.demo_render_mode = str(_param_lookup(cmd_params, "DemoRenderMode", required=False, default="lit")).lower()
+            disable_mld_raw = str(_param_lookup(cmd_params, "DemoDisableMLDeformer", required=False, default="0")).strip()
+            self.disable_ml_deformer = disable_mld_raw in ("1", "true", "yes")
+            self.ml_deformer_disabled_count = 0
 
             output_dir = Path(self.demo_output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -316,6 +347,17 @@ class Hou2UeDemoRuntimeExecutor(unreal.MoviePipelinePythonHostExecutor):
                 unreal.log("[hou2ue] BaseColor render mode: lighting showflags disabled")
             config.find_or_add_setting_by_class(unreal.MoviePipelineImageSequenceOutput_PNG)
             config.initialize_transient_settings()
+
+            # Disable ML Deformer components when rendering the reference capture.
+            # This ensures the reference frames represent the pure skeletal (LBS/DQS)
+            # baseline so that reference-vs-source comparisons measure ML Deformer
+            # correction quality rather than rendering determinism.
+            if self.disable_ml_deformer:
+                world = self.get_last_loaded_world()
+                self.ml_deformer_disabled_count = _disable_ml_deformer_components(world)
+                unreal.log(
+                    f"[hou2ue] disable_ml_deformer=1: disabled {self.ml_deformer_disabled_count} component(s)."
+                )
 
             self.active_movie_pipeline = unreal.new_object(
                 self.target_pipeline_class,

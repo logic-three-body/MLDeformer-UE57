@@ -492,6 +492,18 @@ def main() -> int:
             f"-DemoResY={height}",
             f"-DemoWarmupFrames={warmup_frames}",
             f"-DemoRenderMode={render_mode}",
+            # Disable ML Deformer when:
+            #  - capture_kind == "reference" (always: LBS baseline for comparison)
+            #  - capture_kind == "source" AND capture_cfg["disable_ml_deformer_for_source"]==true
+            #    (use for smoke/determinism tests where both captures should be identical LBS renders)
+            *( ["-DemoDisableMLDeformer=1"]
+               if (
+                   args.capture_kind == "reference"
+                   or (args.capture_kind == "source"
+                       and bool(capture_cfg.get("disable_ml_deformer_for_source", False)))
+               )
+               else [] ),
+
             f"-DemoReportJson={report_json}",
             "-NoLoadingScreen",
             "-NoSound",
@@ -549,6 +561,9 @@ def main() -> int:
 
             cmd = list(cmd)
             cmd[1] = str(source_uproject)
+            # Also sync the executor to the fallback project so DemoDisableMLDeformer
+            # and other hub-only features work correctly in the fallback UE process.
+            _ensure_runtime_executor_available(source_uproject, project_root)
             process_result = _run_guarded_process(
                 cmd=cmd,
                 stdout_path=stdout_path,

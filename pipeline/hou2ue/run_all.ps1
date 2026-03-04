@@ -189,7 +189,10 @@ function Invoke-GuardedProcess(
     }
     else {
         $quotedArgs = Convert-ToQuotedArgs -InputArgs $ArgumentList
-        $proc = Start-Process -FilePath $FilePath -ArgumentList $quotedArgs -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+        # -NoNewWindow keeps the child attached to the current console so console
+        # applications (e.g. Anaconda python.exe) can initialise their console
+        # handles without hanging on Windows.
+        $proc = Start-Process -FilePath $FilePath -ArgumentList $quotedArgs -PassThru -NoNewWindow -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
     }
     if ($null -eq $proc) {
         throw "Failed to start process: $FilePath $($ArgumentList -join ' ')"

@@ -95,22 +95,25 @@ def _strict_thresholds() -> Dict[str, float]:
 
 
 def _pipeline_thresholds() -> Dict[str, float]:
-    """Relaxed thresholds for pipeline-trained models (training_data_source=pipeline).
+    """Strict thresholds for LBS-vs-LBS determinism validation (disable_ml_deformer_for_source=true).
 
-    Pipeline-produced training data uses different GeomCache/animation combinations
-    than the reference project, so the retrained model is expected to produce
-    visually different (but still correct) results.
+    Both reference and source captures use DemoDisableMLDeformer=1 (LBS baseline).
+    Two independent LBS renders of the same scene in basecolor mode should be
+    near-identical (lighting disabled, no Lumen variance, no emissive artifacts
+    from MLD mesh deformation).
+
+    Strict thresholds for rendering determinism + pipeline smoke validation.
     """
     return {
-        "ssim_mean_min": 0.60,
-        "ssim_p05_min": 0.40,
-        "psnr_mean_min": 15.0,
-        "psnr_min_min": 12.0,
-        "edge_iou_mean_min": 0.40,
-        "ms_ssim_mean_min": 0.60,
-        "ms_ssim_p05_min": 0.40,
-        "de2000_mean_max": 20.0,
-        "de2000_p95_max": 35.0,
+        "ssim_mean_min": 0.92,
+        "ssim_p05_min": 0.82,
+        "psnr_mean_min": 25.0,
+        "psnr_min_min": 15.0,
+        "edge_iou_mean_min": 0.80,
+        "ms_ssim_mean_min": 0.88,
+        "ms_ssim_p05_min": 0.75,
+        "de2000_mean_max": 5.0,
+        "de2000_p95_max": 10.0,
     }
 
 
