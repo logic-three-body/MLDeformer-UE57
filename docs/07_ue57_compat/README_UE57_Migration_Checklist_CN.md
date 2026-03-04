@@ -180,10 +180,50 @@
 | R3 | `pipeline.yaml` + `pipeline.full_exec.yaml` 均设置 `render_mode: "basecolor"` | ✅ | `ue.ground_truth.capture.render_mode` |
 | R4 | `static_reference_frames_dir` 和 `static_source_frames_dir` 均已清空 | ✅ | BaseColor 模式下 Lumen 已禁用，不再需要静态帧旁路 |
 | R5 | `Hou2UeDemoRuntimeExecutor.py` 已同步至 UE5.7 工程 `Content/Python/` | ✅ | 手动同步至 `UE57\MLDeformerSample\Content\Python\` |
-| R6 | BaseColor 模式 GT 对比运行成功，SSIM 接近 1.0（F0–99 预估） | ⬜ | Phase R 执行中 |
-| R7 | BaseColor 数据确认后将阈值收紧 `ssim_mean_min → 0.97`，删除 `debug_mode` | ⬜ | 待 R6 通过后执行 |
+| R6 | BaseColor 模式 GT 对比运行成功，SSIM 接近 1.0（F0–99 预估） | ✅ | Run `20260301_162455_smoke`：SSIM=0.9995，PSNR=62.1 dB，ALL PASS |
+| R7 | BaseColor 数据确认后将阈值收紧 `ssim_mean_min → 0.97`，删除 `debug_mode` | ⬜ | R6 已通过，待独立 commit 收紧阈值 |
 
 **提交**：`98e26ba` — Add BaseColor render mode: disable lighting showflags to eliminate Lumen variance
+
+### 阶段 R 验证结果（Run 20260301_162455_smoke）
+
+| 指标 | 实测值 | 阈值 | 状态 |
+|------|--------|------|------|
+| ssim_mean | 0.9995 | ≥ 0.80 | ✅ |
+| psnr_mean | 62.1 dB | ≥ 22.0 | ✅ |
+| 总帧数 | 1560 | — | ✅ |
+
+**Heatmap 修复**：`compare_groundtruth.py` `_write_heatmap()` 由硬编码 `clip(diff, 0, 255)` 改为自动标准化 `ceil = max(diff.max(), 30.0)`，使微小色差可见（r_max 从 7–22 提升至 119–187/255）。
+
+### 相机机位调查记录（2026-03-0x）
+
+> 背景：用户发现 run `20260226_200951_smoke`（旧）与 `20260301_162455_smoke`（新）的 reference 帧视觉差异极大，怀疑相机机位发生变化。
+
+**调查结论：相机机位未发生变化。** 视觉差异完全由渲染模式切换（Lit → BaseColor）造成。
+
+**关键证据**
+
+| 对比组 | SSIM | 解释 |
+|--------|------|------|
+| UE5.7 Lit src vs UE5.7 BaseColor ref（同引擎、同相机、不同模式） | 0.61 | 纯渲染模式差异 |
+| UE5.5 Lit ref vs UE5.7 Lit src（跨引擎、同相机、同模式） | 0.80–0.91 | 引擎版本差异 + ML误差 |
+| UE5.7 BaseColor ref vs UE5.7 BaseColor src（同次运行内部） | 0.9994 | ML Deformer 精度 |
+| Template match：UE5.5 Lit ref → UE5.7 Lit src | **2.8 px** | 相机位置一致 ✅ |
+| Template match：UE5.5 Lit ref → UE5.7 BaseColor ref | 477 px（误报） | 渲染模式破坏相似度，模板匹配失效 |
+
+**根本原因（实为预期行为）**
+
+- 旧跑（`20260226_200951_smoke`）：`static_bypass: true`，reference 来自 `20260226_170226_smoke` 的 **UE5.5 Lit** 帧（`static_reference_frames_dir` 旁路）。  
+- 新跑（`20260301_162455_smoke`）：`da048d5` 提交清空 `static_reference_frames_dir`，引擎从 UE5.7 重新渲染 **BaseColor** 帧。  
+- Background 从 Lit（亮、约 80 mean）变为 BaseColor（纯黑、约 56 mean），占画面约 60–70%，导致 SSIM 从 0.84 降至 0.61——即使相机完全不动。  
+- BaseColor 模式下 Canny 边缘重心偏移（229–448 px）与模板匹配位移（477 px）均为背景消失导致的**算法误报**，不代表镜头移动。
+
+**两次运行的对比语义不同**
+
+| 运行 | reference 来源 | 渲染模式 | 衡量内容 |
+|------|--------------|---------|----------|
+| `20260226_200951_smoke` | UE5.5 Lit 静态旁路 | Lit (全光照) | 跨引擎兼容性（含引擎版本差异）|
+| `20260301_162455_smoke` | UE5.7 重新渲染 | BaseColor (unlit albedo) | ML Deformer 纯精度（排除引擎差异）|
 
 ---
 
