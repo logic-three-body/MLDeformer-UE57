@@ -235,8 +235,9 @@
                                                      "deformer_graph":  "/Game/Characters/Emil/Deformers/DG_LBS_Morph_RecomputeNormals",
                                                      "training_input_anims":  [
                                                                                   {
-                                                                                      "anim_sequence":  "/Game/Characters/Emil/Animation/MLD_train/upperBody_7000",
-                                                                                      "geometry_cache_template":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_upperBodyFlesh_{profile}",
+                                                                                      "_original_anim_7000_note":  "upperBody_7000 paired with GC_upperBodyFlesh_smoke had p50=90.7cm vertex offsets (>100cm range) -- BAD",
+                                                                                      "anim_sequence":  "/Game/Characters/Emil/Animation/MLD_train/upperBodyFlesh_hero64",
+                                                                                      "geometry_cache_template":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_upperBodyFlesh_hero64",
                                                                                       "enabled":  true
                                                                                   }
                                                                               ],

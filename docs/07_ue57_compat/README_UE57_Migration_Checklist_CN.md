@@ -294,8 +294,10 @@
 | T bypass（原始权重）| `20260226_200951_smoke` | 306 MB 原始（Refference）| **0.8832** | ✅ ALL PASS | `skip_train=true`，使用项目原生预训练权重 |
 | T v2（训练回归）| `20260305_130217_smoke` | 2 GB 训练后（2026-03-03）| **0.5904** | ❌ FAIL | March 3 训练写入错误顶点偏移，shots 5-6 近黑帧（F1231-1428）|
 | T v3（回滚修复）| `20260305_141106_smoke` | 306 MB 恢复（Refference）| **0.9142** | ✅ ALL PASS | 恢复预训练模型，方向已确认正确 |
+| T v4（hero64 训练测试）| `20260305_141106_smoke` | 357 MB 本地训练（hero64 GC）| **0.637** | ❌ FAIL | 训练数据质量正常（p50_GC=4.0 cm）但 hero64 pose 不覆盖 Main_Sequence |
+| **T v4b（基线确认）** | `20260305_141106_smoke` | 306 MB 恢复（Refference）| **0.9142** | ✅ ALL PASS | 还原 Refference 模型确认稳定；**当前已验证基线** |
 
-### T v3 详细指标（1560 帧，`20260305_141106_smoke`）
+### T v3 / T v4b 详细指标（1560 帧，`20260305_141106_smoke`，Refference NMM 306 MB）
 
 | 指标 | 实测值 | 阈值 | 状态 |
 |------|--------|------|------|
@@ -309,7 +311,7 @@
 | de2000_mean | 1.584 | ≤ 8.0 | ✅ |
 | de2000_p95 | 4.012 | ≤ 15.0 | ✅ |
 
-### T v3 逐段 SSIM（100帧窗口）
+### T v3 / T v4b 逐段 SSIM（100帧窗口，Refference NMM）
 
 | 帧段 | ssim_mean | 说明 |
 |------|-----------|------|
@@ -337,8 +339,9 @@
 
 | 资产 | 路径 | 大小 | 状态 | 备注 |
 |------|------|------|------|------|
-| `MLD_NMMl_flesh_upperBody.uasset` | `.../Deformers/` | 306 MB | ⚠️ 预训练（未有效训练）| March 3 训练→2 GB 有害模型→已回滚至 Refference 原版；**需重新训练** |
-| `MLD_NMMl_flesh_upperBody.uasset.2gb_backup_20260303` | `.../Deformers/` | 1985 MB | 🗄️ 备份 | March 3 失败训练模型备份 |
+| `MLD_NMMl_flesh_upperBody.uasset` | `.../Deformers/` | **306 MB** | ✅ 预训练（Epic 原版）| **当前有效**：T v4b 确认 ssim=0.9142；本地 hero64 训练=0.637（差）→已还原 |
+| `MLD_NMMl_flesh_upperBody.uasset.2gb_backup_20260303` | `.../Deformers/` | 1985 MB | 🗄️ 备份 | March 3 失败训练模型（smoke GC 异常顶点偏移） |
+| `MLD_NMMl_flesh_upperBody.uasset.hero64_backup_20260305` | `.../Deformers/` | 374 MB | 🗄️ 备份 | 2026-03-05 hero64 训练模型（几何质量好但 pose 覆盖不足） |
 | `MLD_NN_lowerCostume.uasset` | `.../Deformers/` | 258 MB | ✅ 已训练（2026-03-02）| Refference 原始 453 MB；训练后缩小，当前性能正常 |
 | `MLD_NN_upperCostume.uasset` | `.../Deformers/` | 568 MB | ✅ 已训练（2026-03-02）| Refference 原始 832 MB；训练后缩小，当前性能正常 |
 
@@ -348,11 +351,26 @@
 
 | # | 问题 | 状态 | 方向 |
 |---|------|------|------|
-| TM1 | **NMM 预训练精度不足**（F500–699，ssim≈0.82）| ⚠️ 当前限制 | 需再次训练 NMM flesh 模型；先定位 March 3 训练失败根因 |
-| TM2 | **NMM 训练回归（2 GB 模型）** | ✅ 已临时修复（回滚）| 根因待查：训练数据质量、iterations=2000 过拟合、UE5.7 NMM API 变更? |
+| TM1 | **NMM 预训练精度不足**（F500–699，ssim≈0.82）| ⚠️ 当前限制 | 需使用覆盖 Main_Sequence pose 空间的动画数据重新训练 NMM |
+| TM2 | **NMM 训练回归（2 GB 模型）** | ✅ 根因已查明 | `GC_upperBodyFlesh_smoke` 顶点偏移异常（p50=90.7 cm）来自 Houdini 导出问题 |
+| TM3 | **hero64 训练 pose 覆盖不足** | ✅ 已确认 | hero64（5065帧）pose 空间≠ Main_Sequence；训练数据必须匹配推理动画 |
+| TM4 | **`num_iterations:2000` 配置未生效** | 🔲 待查 | UE5.7 NMM 默认使用 25,000 iterations，config 覆盖值无效 |
+
+### T-MLD 已完成里程碑
+
+| 里程碑 | 日期 | 结果 |
+|--------|------|------|
+| Phase S LBS-vs-LBS 基准 | 2026-02-26 | ssim=0.9994 ✅（commit `9b3b172`）|
+| T bypass Refference 预训练 | 2026-02-26 | ssim=0.8832 ✅（commit `53f3e72`）|
+| T v2 训练回归记录 | 2026-03-05 | ssim=0.5904 ❌（commit `609a33d`）|
+| T v3 回滚稳定基线 | 2026-03-05 | ssim=0.9142 ✅（commits `6ed4371` + `f02d912`）|
+| TI NMM 训练根因调查 | 2026-03-05 | smoke GC p50=90.7 cm 根因确认（commit `a641103`）|
+| T v4 hero64 训练测试 | 2026-03-05 | ssim=0.637 ❌（几何质量好但 pose 覆盖不足）|
+| **T v4b 基线还原确认** | **2026-03-05** | **ssim=0.9142 ✅（Refference 306 MB 为有效基线）** |
 
 ### 下一步目标
 
-1. **调查 NMM 训练失败机制**（见阶段 TI）
-2. 修复后重新训练 NMM flesh 模型
-3. 验证目标：`ssim_mean ≥ 0.92`，`ssim_p05 ≥ 0.85`，F500–699 ssim ≥ 0.88
+1. **修复 Houdini smoke GC 导出**（单位/坐标系问题，`GC_upperBodyFlesh_smoke`顶点偏移需 < 30 cm）
+2. 使用修复后 smoke GC + `upperBody_7000`（full pose coverage）重新训练 NMM
+3. 验证目标：`ssim_mean ≥ 0.92`，F500–699 ssim ≥ 0.88
+4. 调查 `num_iterations:2000` pipeline 配置项未覆盖 UE5.7 NMM 默认值问题
