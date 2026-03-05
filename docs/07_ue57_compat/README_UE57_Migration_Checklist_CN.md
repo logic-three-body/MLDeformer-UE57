@@ -277,3 +277,82 @@
 | de2000_p95 | 0.134 | ≤ 2.5 | ✅ |
 
 **提交**：阶段 S——tighten thresholds for BaseColor self-comparison
+
+---
+
+## 阶段 T-MLD：MLD 测量——LBS-vs-MLD GT 对比（2026-03-05）
+
+> 目标：在 UE5.7 下量化 ML Deformer（NMM + NN 服装模型）与 LBS Ground Truth 的误差。  
+> Reference = LBS（禁用 MLD 的 BaseColor 帧）；Source = MLD 激活的 BaseColor 帧。  
+> 阈值：`ssim_mean_min: 0.83`（Phase T pipeline thresholds，已放宽至 MLD 精度预期）。
+
+### T-MLD 执行历史
+
+| 轮次 | Run | NMM flesh 模型 | ssim_mean | 结果 | 说明 |
+|------|-----|--------------|-----------|------|------|
+| Phase S（LBS-vs-LBS 基准）| `20260226_200951_smoke` | — (MLD 禁用) | **0.9994** | ✅ ALL PASS | LBS-vs-LBS 基准，ssim≈1.0 确认 pipeline 精度 |
+| T bypass（原始权重）| `20260226_200951_smoke` | 306 MB 原始（Refference）| **0.8832** | ✅ ALL PASS | `skip_train=true`，使用项目原生预训练权重 |
+| T v2（训练回归）| `20260305_130217_smoke` | 2 GB 训练后（2026-03-03）| **0.5904** | ❌ FAIL | March 3 训练写入错误顶点偏移，shots 5-6 近黑帧（F1231-1428）|
+| T v3（回滚修复）| `20260305_141106_smoke` | 306 MB 恢复（Refference）| **0.9142** | ✅ ALL PASS | 恢复预训练模型，方向已确认正确 |
+
+### T v3 详细指标（1560 帧，`20260305_141106_smoke`）
+
+| 指标 | 实测值 | 阈值 | 状态 |
+|------|--------|------|------|
+| ssim_mean | 0.9142 | ≥ 0.83 | ✅ |
+| ssim_p05 | 0.7864 | ≥ 0.70 | ✅ |
+| psnr_mean | 30.63 dB | ≥ 22.0 | ✅ |
+| psnr_min | 17.23 dB | ≥ 14.0 | ✅ |
+| edge_iou_mean | 0.9036 | ≥ 0.82 | ✅ |
+| ms_ssim_mean | 0.8936 | ≥ 0.80 | ✅ |
+| ms_ssim_p05 | 0.7304 | ≥ 0.65 | ✅ |
+| de2000_mean | 1.584 | ≤ 8.0 | ✅ |
+| de2000_p95 | 4.012 | ≤ 15.0 | ✅ |
+
+### T v3 逐段 SSIM（100帧窗口）
+
+| 帧段 | ssim_mean | 说明 |
+|------|-----------|------|
+| 0–99 | 0.9784 | 静止姿态 |
+| 100–199 | 0.9503 | |
+| 200–299 | 0.9485 | |
+| 300–399 | 0.9462 | |
+| 400–499 | 0.8342 | |
+| **500–599** | **0.8206** | ⚠️ 略低于阈值——NMM 预训练对极端姿态预测精度不足 |
+| **600–699** | **0.8083** | ⚠️ 略低于阈值——diff_mean≈9px，非近黑帧（≠ T v2 崩坏） |
+| 700–799 | 0.8505 | |
+| 800–899 | 0.8986 | |
+| 900–999 | 0.9269 | |
+| 1000–1099 | 0.8941 | |
+| 1100–1199 | 0.9459 | |
+| 1200–1299 | 0.9799 | |
+| 1300–1399 | 0.9569 | |
+| 1400–1499 | 0.9456 | |
+| 1500–1559 | 0.9610 | |
+
+> 帧 500–699 差异为 *柔和*（diff_mean 5–20 px，ref_mean 70–93），非 T v2 的近黑帧崩坏（diff_mean 40+，src_mean≈16）。  
+> 根因：NMM 预训练权重在该动画段的极端姿态处形变预测不准。
+
+### 当前资产状态
+
+| 资产 | 路径 | 大小 | 状态 | 备注 |
+|------|------|------|------|------|
+| `MLD_NMMl_flesh_upperBody.uasset` | `.../Deformers/` | 306 MB | ⚠️ 预训练（未有效训练）| March 3 训练→2 GB 有害模型→已回滚至 Refference 原版；**需重新训练** |
+| `MLD_NMMl_flesh_upperBody.uasset.2gb_backup_20260303` | `.../Deformers/` | 1985 MB | 🗄️ 备份 | March 3 失败训练模型备份 |
+| `MLD_NN_lowerCostume.uasset` | `.../Deformers/` | 258 MB | ✅ 已训练（2026-03-02）| Refference 原始 453 MB；训练后缩小，当前性能正常 |
+| `MLD_NN_upperCostume.uasset` | `.../Deformers/` | 568 MB | ✅ 已训练（2026-03-02）| Refference 原始 832 MB；训练后缩小，当前性能正常 |
+
+> **NN 服装模型说明**：March 2 训练使 NN 模型缩小（NearestNeighbor lookup table 大小不同），但 ssim=0.9142 **优于** 使用 Refference 原始 NN 模型的 T bypass（ssim=0.8832），确认其训练有效。
+
+### T-MLD 已知问题
+
+| # | 问题 | 状态 | 方向 |
+|---|------|------|------|
+| TM1 | **NMM 预训练精度不足**（F500–699，ssim≈0.82）| ⚠️ 当前限制 | 需再次训练 NMM flesh 模型；先定位 March 3 训练失败根因 |
+| TM2 | **NMM 训练回归（2 GB 模型）** | ✅ 已临时修复（回滚）| 根因待查：训练数据质量、iterations=2000 过拟合、UE5.7 NMM API 变更? |
+
+### 下一步目标
+
+1. **调查 NMM 训练失败机制**（见阶段 TI）
+2. 修复后重新训练 NMM flesh 模型
+3. 验证目标：`ssim_mean ≥ 0.92`，`ssim_p05 ≥ 0.85`，F500–699 ssim ≥ 0.88

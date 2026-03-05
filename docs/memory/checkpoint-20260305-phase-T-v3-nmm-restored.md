@@ -45,16 +45,52 @@ All 9 metrics PASS.
 Static frames from `20260301_162455_smoke` (LBS reference,
 `static_reference_frames_dir` set in config).
 
+## NN Costume Model Status
+
+| Asset | Size (pipeline project) | Size (Refference) | Trained? | Status |
+|-------|------------------------|-------------------|----------|--------|
+| `MLD_NN_lowerCostume.uasset` | 258 MB (2026-03-02) | 453 MB (2026-02-01) | ✅ March 2 | OK — ssim improved vs Refference weights |
+| `MLD_NN_upperCostume.uasset` | 568 MB (2026-03-02) | 832 MB (2026-02-01) | ✅ March 2 | OK — ssim improved vs Refference weights |
+| `MLD_NMMl_flesh_upperBody.uasset` | 306 MB (restored) | 306 MB (2026-02-01) | ❌ (training reverted) | Pre-training state; needs proper retraining |
+
+NN costume training (March 2) produced SMALLER models (lookup table pruned) but
+**improved** ssim: T bypass (Refference NN, original NMM) = 0.8832 vs T v3
+(trained NN, original NMM) = 0.9142. Costume models do NOT need restoration.
+
+`NearestNeighborModel.ubnne` = 240 KB (2026-03-02, written alongside NN training).
+
+## Per-Window SSIM (T v3, 100-frame windows)
+
+| Frames | ssim_mean | Note |
+|--------|-----------|------|
+| 0–99 | 0.9784 | |
+| 100–199 | 0.9503 | |
+| 200–299 | 0.9485 | |
+| 300–399 | 0.9462 | |
+| 400–499 | 0.8342 | |
+| **500–599** | **0.8206** | ⚠ below threshold — NMM pre-training imprecision on extreme poses |
+| **600–699** | **0.8083** | ⚠ below threshold — diff_mean≈9px, NOT near-black (≠ T v2 corruption) |
+| 700–799 | 0.8505 | |
+| 800–1559 | 0.90–0.98 | all good |
+
+Frames 500–699 show **mild** rendering differences (src_mean 57–89, ref_mean 70–93,
+diff_mean 5–20 px) — not the catastrophic near-black collapse of T v2 (src_mean≈16).
+Root cause: NMM pre-training weights predict inaccurate deformation for this
+animation segment. Will resolve after proper NMM retraining.
+
 ## Phase History
 
 | Phase     | Run                   | ssim_mean | Result  |
-|-----------|-----------------------|-----------|---------|
+|-----------|----------------------|-----------|---------|
 | S (LBS)   | 20260226_195846_smoke | 0.9994    | PASS    |
 | T bypass  | 20260226_200951_smoke | 0.8832    | PASS    |
 | T v2 (↓)  | 20260305_130217_smoke | 0.5904    | FAIL    |
 | T v3 (✅) | 20260305_141106_smoke | 0.9142    | PASS    |
 
 ## TODO
-- Investigate why UE5.7 NMM training produces harmful vertex offsets.
-  Possible causes: geometry cache quality, broken GC normals, training anim range
-  mismatch, or UE5.7 NMM training API regression.
+- **Primary**: Investigate why NMM training (March 3) produced harmful 2GB model.
+  Hypotheses: geometry cache quality / GC normals broken; training anim range
+  mismatch; outputs.bin vertex deltas (1.28 GB) too large; UE5.7 NMM training
+  API change writing unbounded offsets.
+- Re-train NMM flesh model with corrected settings.
+- Target after proper training: ssim_mean ≥ 0.92, F500–699 ssim ≥ 0.88.
