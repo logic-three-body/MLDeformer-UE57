@@ -489,5 +489,19 @@
                                                                   "/Game/Maps/L_MLD_LearningCorridor"
                                                               ]
                                         }
-                           }
+                           },
+    "report": {
+        "allowed_missing_stages": [
+            "baseline_sync",
+            "preflight",
+            "houdini",
+            "convert",
+            "ue_import",
+            "ue_setup",
+            "infer",
+            "reference_setup_dump",
+            "setup_diff"
+        ],
+        "_note": "GT-only partial run: upstream pipeline stages (Houdini, UE import, infer) and strict_clone dump stages are intentionally absent. Only train + GT capture/compare stages are validated."
+    }
 }

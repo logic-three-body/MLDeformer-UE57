@@ -73,6 +73,13 @@ def _yaml_scalar(value: Any) -> str:
 def _copy_latest(run_dir: Path, out_root: Path, profile: str) -> Path:
     import os as _os
     latest_dir = out_root / "latest" / profile
+    # If run_dir is already the latest dir, nothing to copy — just return it.
+    try:
+        same = run_dir.resolve() == latest_dir.resolve()
+    except OSError:
+        same = False
+    if same:
+        return latest_dir
     if latest_dir.exists() or latest_dir.is_symlink():
         try:
             shutil.rmtree(latest_dir)
@@ -207,6 +214,11 @@ def main() -> int:
         # Stages that produce GeomCache and are skipped when skip_train=true
         skip_train_bypass_stages = {"preflight", "houdini", "convert", "ue_import"}
 
+        # Stages that are explicitly allowed to be missing (partial / GT-only runs)
+        report_cfg = cfg.get("report", {}) if isinstance(cfg.get("report"), dict) else {}
+        allowed_missing_cfg = report_cfg.get("allowed_missing_stages", [])
+        allowed_missing_stages: set = set(allowed_missing_cfg) if isinstance(allowed_missing_cfg, list) else set()
+
         stage_reports: Dict[str, Dict[str, Any] | None] = {}
         failures: List[Dict[str, Any]] = []
         for stage in stages:
@@ -215,6 +227,9 @@ def main() -> int:
             if sr is None:
                 if skip_train_flag and stage in skip_train_bypass_stages:
                     # These stages are intentionally skipped under skip_train shortcut
+                    continue
+                if stage in allowed_missing_stages:
+                    # Stage explicitly allowed to be absent (partial / GT-only run)
                     continue
                 failures.append({"stage": stage, "message": "Missing stage report"})
                 continue
@@ -286,14 +301,14 @@ def main() -> int:
         strict_clone_enabled = bool(strict_clone_cfg.get("enabled", False))
         skip_train = bool(training_cfg.get("skip_train", False))
         if strict_clone_enabled:
-            if reference_setup_dump_report is None:
+            if reference_setup_dump_report is None and "reference_setup_dump" not in allowed_missing_stages:
                 failures.append(
                     {
                         "stage": "reference_setup_dump",
                         "message": "Missing reference_setup_dump_report.json while strict_clone is enabled.",
                     }
                 )
-            elif reference_setup_dump_report.get("status") != "success":
+            elif reference_setup_dump_report is not None and reference_setup_dump_report.get("status") != "success":
                 failures.append(
                     {
                         "stage": "reference_setup_dump",
@@ -305,7 +320,7 @@ def main() -> int:
             # When skip_train is enabled, ue_setup is skipped entirely so no setup_diff
             # is generated.  The reference networks are used directly, making the diff
             # unnecessary — asset configs are unchanged from reference baseline.
-            if setup_diff_report is None and not skip_train:
+            if setup_diff_report is None and not skip_train and "setup_diff" not in allowed_missing_stages:
                 failures.append(
                     {
                         "stage": "setup_diff",
