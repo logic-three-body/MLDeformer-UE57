@@ -71,9 +71,15 @@ def _yaml_scalar(value: Any) -> str:
 
 
 def _copy_latest(run_dir: Path, out_root: Path, profile: str) -> Path:
+    import os as _os
     latest_dir = out_root / "latest" / profile
-    if latest_dir.exists():
-        shutil.rmtree(latest_dir)
+    if latest_dir.exists() or latest_dir.is_symlink():
+        try:
+            shutil.rmtree(latest_dir)
+        except OSError:
+            # Windows directory junction: rmtree refuses to recurse into one;
+            # os.rmdir removes the junction leaf without touching the target.
+            _os.rmdir(str(latest_dir))
     latest_dir.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(run_dir, latest_dir)
     return latest_dir
