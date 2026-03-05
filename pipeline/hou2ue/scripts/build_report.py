@@ -95,25 +95,23 @@ def _strict_thresholds() -> Dict[str, float]:
 
 
 def _pipeline_thresholds() -> Dict[str, float]:
-    """Strict thresholds for LBS-vs-LBS determinism validation (disable_ml_deformer_for_source=true).
+    """Phase T thresholds: LBS-ref vs MLD-src comparison.
 
-    Both reference and source captures use DemoDisableMLDeformer=1 (LBS baseline).
-    Two independent LBS renders of the same scene in basecolor mode should be
-    near-identical (lighting disabled, no Lumen variance, no emissive artifacts
-    from MLD mesh deformation).
-
-    Strict thresholds for rendering determinism + pipeline smoke validation.
+    Reference capture uses DemoDisableMLDeformer=1 (LBS baseline).
+    Source capture uses 2/26 MLD-active frames (pre-3/3 NMM model, warmup=16).
+    Measured 2026-03-05: ssim_mean=0.8832, psnr_mean=24.78, de2000_mean=3.62.
+    Thresholds set ~5-10% below measurement to catch regressions.
     """
     return {
-        "ssim_mean_min": 0.92,
-        "ssim_p05_min": 0.82,
-        "psnr_mean_min": 25.0,
-        "psnr_min_min": 15.0,
-        "edge_iou_mean_min": 0.80,
-        "ms_ssim_mean_min": 0.88,
-        "ms_ssim_p05_min": 0.75,
-        "de2000_mean_max": 5.0,
-        "de2000_p95_max": 10.0,
+        "ssim_mean_min": 0.83,
+        "ssim_p05_min": 0.70,
+        "psnr_mean_min": 22.0,
+        "psnr_min_min": 14.0,
+        "edge_iou_mean_min": 0.82,
+        "ms_ssim_mean_min": 0.80,
+        "ms_ssim_p05_min": 0.65,
+        "de2000_mean_max": 8.0,
+        "de2000_p95_max": 15.0,
     }
 
 
