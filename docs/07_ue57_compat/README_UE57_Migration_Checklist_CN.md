@@ -84,7 +84,7 @@
 
 | # | 问题描述 | 影响阶段 | 状态 | 解决方案 |
 |---|---------|---------|------|---------|
-| F1 | **形变质量差距**（帧 470–490 最差：SSIM≈0.711，PSNR≈17dB，EdgeIoU≈0.50，ΔE≈8.67；帧 400–599 整体 SSIM≈0.76，Edge≈0.69）| gt_compare | ⚠️ 已记录 | **原因（形变分量）**：UE5.5 预训练 `.nmn` 权重在 UE5.7 推理系统下产生错误 mesh 形变（Body ROI SSIM < 全局 SSIM，错误集中于角色体型区域；EdgeIoU=0.50 = 轮廓/形状坍塌），而非仅色彩差异。**修复方案**：Phase T — 使用 UE5.7 原生训练数据重新训练，预期 F470–490 SSIM ≥ 0.88，EdgeIoU ≥ 0.92。 |
+| F1 | **形变质量差距**（帧 470–490 最差：SSIM≈0.711，PSNR≈17dB，EdgeIoU≈0.50，ΔE≈8.67；帧 400–599 整体 SSIM≈0.76，Edge≈0.69）| gt_compare | ⚠️ **Phase U 重训中**（2026-03-05） | **根因（已视觉确认）**：人眼 1349 帧对比（20260226 source MLD-active vs 20260305 reference LBS-only）确认 NMM 为崩坏主因，LBS 帧崩坏极少。之前两次 pipeline 训练均失败：smoke GC p50=90.7cm（单位错误），hero64 pose 覆盖不足。**Phase U 修复方案**：改用 `GC_upperBodyFlesh_5kGreedyROM`（PDG 原始 Feb 2，8.46 GB，正常顶点偏移，宽 pose 覆盖）重训 NMM flesh，目标 ssim_mean ≥ 0.9142（T v4b Refference NMM 基准）。 |
 | F2 | **渲染器基准差距**（Lumen/VSM/TAA 引擎内部变更，Lit 模式 ~8% SSIM 底线）| gt_compare | ✅ 已解决（改用 BaseColor 模式） | **根因**：Lumen GI / VSM / TAA 算法变更，配置层面不可消除。**已解决**：Phase R 引入 BaseColor 渲染模式（禁用 showflag.Lighting 等 9 个 showflag），两侧均只渲染 unlit 漫反射，消除 Lumen 底线噪声。BaseColor 模式下 F0–99 SSIM 预计接近 1.0。 |
 
 ---
@@ -98,6 +98,7 @@
 | H1 | 比对两版本 `DefaultEngine.ini`：`[/Script/Engine.RendererSettings]` 完全相同 | ✅ | `UE57/Config/` 与 `Refference/Config/` 逐字节一致，排除配置差异 |
 | H2 | 识别渲染器内部变更分量（约 8% SSIM）：F0–99 静止帧已显示差距，deformer 贡献近零 | ✅ | SSIM<sub>F0-99</sub>=0.918 vs 0.997；此分量由 Lumen GI / VSM / TAA 算法变更引起，配置层面不可消除 |
 | H3 | 设定训练后质量目标：`ssim_mean_min` 0.80（debug_mode）→ 0.92（训练后），F470–490 SSIM ≥ 0.88，EdgeIoU ≥ 0.92 | ✅ | 已记录于 `pipeline.full_exec.yaml` `_thresholds_post_training_note` 注释 |
+| H4 | 人眼 1349 帧对比（20260226 source vs 20260305 reference）确认 NMM 是崩坏主因 | ✅ | LBS reference 崩坏帧极少；MLD-active source 崩坏帧明显多。方向确认正确：修复训练数据（5kGreedyROM GC）是关键修复路径。当前稳定基准：T v4b ssim_mean=0.9142（Refference 306MB NMM）。Phase U 目标：管线训练版本 ≥ 0.9142。 |
 
 ---
 
@@ -374,3 +375,81 @@
 2. 使用修复后 smoke GC + `upperBody_7000`（full pose coverage）重新训练 NMM
 3. 验证目标：`ssim_mean ≥ 0.92`，F500–699 ssim ≥ 0.88
 4. 调查 `num_iterations:2000` pipeline 配置项未覆盖 UE5.7 NMM 默认值问题
+
+---
+
+## 阶段 U：Phase U — 5kGreedyROM 重训（2026-03-05/07）
+
+> 使用 PDG 原始 `GC_upperBodyFlesh_5kGreedyROM`（Feb 2，8.46 GB，p50<30cm，宽 pose 覆盖）重训 NMM flesh。
+> 两次尝试，均失败（ssim=0.66 < 0.83 目标）。
+
+### Phase U 训练结果
+
+| 轮次 | 数据 | mode | 模型大小 | ssim_mean | 结果 | 说明 |
+|------|------|------|---------|-----------|------|------|
+| U v1（5kGreedyROM）| `GC_upperBodyFlesh_5kGreedyROM` | **Local**（默认）| 1680 MB | 0.6599 | ❌ FAIL | Local 模式，过大模型，过拟合/泛化差 |
+| U v1b（重跑验证）| 同上 | **Local**（默认）| 1680 MB | 0.6599 | ❌ FAIL | 结果完全相同，排除随机因素 |
+
+### Phase U 根因分析（2026-03-07 本 session 确认）
+
+**关键发现：Epic Refference NMM 使用 Global 模式，all our experiments 使用 Local 模式（默认）。**
+
+| 对比项 | Epic Refference (ssim=0.9142) | Phase U 实验（ssim=0.66）|
+|--------|-------------------------------|--------------------------|
+| NMM mode | **Global** | Local（UE 默认）|
+| 形态目标数 | **128**（global_num_morph_targets）| 本地每骨骼 6 × ~80 骨骼 |
+| 模型大小 | **306 MB** = 128 × 200k × 3 × 4 ✅ | 1680 MB（过大）|
+| 训练后 loss | ~0.011（极低）| >1.4（收敛差）|
+
+**证明**：128 global morphs × ~200k body vertices × 3 axes × 4 bytes/float = **307 MB** ≈ Epic Refference 306 MB ✅
+
+### Phase U 配置问题
+
+TM4 根因确认：`num_iterations: 2000` 曾写入 config 但训练实际使用 25000（UE NMM 内部默认值 override 失效）。已修复：现在 config 明确写 `num_iterations: 25000`。
+
+---
+
+## 阶段 V：Phase V — Global Mode 修复训练（2026-03-07/08）
+
+> 根因确认为 NMM 模式错误。切换为 `mode: "global" + global_num_morph_targets: 128`，与 Epic Refference 架构一致。
+
+### V-MAIN 配置（GPU0）
+
+```json
+"model_overrides": {
+  "mode": "global",
+  "global_num_morph_targets": 128,
+  "global_num_hidden_layers": 2,
+  "global_num_neurons_per_layer": 128,
+  "num_iterations": 25000
+}
+```
+
+训练数据：`upperBodyFlesh_5kGreedyROM` + `GC_upperBodyFlesh_5kGreedyROM`（5000 帧 GreedyROM，8.46 GB）
+
+### V-MAIN 训练进度
+
+| 状态 | 详情 |
+|------|------|
+| ue_setup | ✅ 2026-03-07 22:48（global 128 morphs 已配置）|
+| train | 🔄 **进行中**（截至 2026-03-08 00:26 UTC，iter=21901/25000，loss=0.011，剩余~1.5min）|
+| gt_source_capture | ⏳ 待执行（训练完成后立即执行）|
+| gt_compare | ⏳ 待执行 |
+| 目标 ssim | ≥ 0.83（预期接近 0.9142）|
+
+### V3 并行实验（GPU1，256 morphs）
+
+| 状态 | 详情 |
+|------|------|
+| ue_setup | ✅ 2026-03-07 23:16（global 256 morphs，pipeline_base_config 应用）|
+| train | ❌ 崩溃于 iter 5401（1.78GB GPU，loss≈1.44）— UE exit -1 无效 train_report |
+| 根因 | UE 崩溃（exit -1）运行结束但未写入有效 report；V3 run_all.ps1 仅支持有限重试 |
+| 下一步 | 删除旧 train_report → 重跑；若 MAIN 已达目标可跳过 |
+
+### 闭环判定阈值（LBS-ref vs MLD-src，BaseColor，1560 帧）
+
+| 指标 | 目标 | Epic Refference v4b 实测 |
+|------|------|--------------------------|
+| ssim_mean | **≥ 0.83** | 0.9142 |
+| psnr_mean | **≥ 22.0 dB** | 30.63 dB |
+| edge_iou_mean | **≥ 0.82** | 0.9036 |

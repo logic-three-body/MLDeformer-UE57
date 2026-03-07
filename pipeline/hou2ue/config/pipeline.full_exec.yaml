@@ -235,15 +235,19 @@
                                                      "deformer_graph":  "/Game/Characters/Emil/Deformers/DG_LBS_Morph_RecomputeNormals",
                                                      "training_input_anims":  [
                                                                                   {
-                                                                                      "_original_anim_7000_note":  "upperBody_7000 paired with GC_upperBodyFlesh_smoke had p50=90.7cm vertex offsets (>100cm range) -- BAD",
-                                                                                      "anim_sequence":  "/Game/Characters/Emil/Animation/MLD_train/upperBodyFlesh_hero64",
-                                                                                      "geometry_cache_template":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_upperBodyFlesh_hero64",
+                                                                                      "_note_training_history":  "Phase V2 (2026-03-07): V-1/Phase-U used LocalMode (1680MB model, ssim=0.66). Root cause: Epic Refference is GlobalMode+128morphs (306MB=128*200k*3*4bytes). Switching to mode=global+global_num_morph_targets=128 to match Epic architecture. Using 5kGreedyROM for wide pose coverage.",
+                                                                                      "anim_sequence":  "/Game/Characters/Emil/Animation/MLD_train/upperBodyFlesh_5kGreedyROM",
+                                                                                      "geometry_cache_template":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_upperBodyFlesh_5kGreedyROM",
                                                                                       "enabled":  true
                                                                                   }
                                                                               ],
                                                      "test_anim_sequence":  "/Game/Characters/Emil/Animation/Test/Emil_box_in_place_test",
                                                      "model_overrides":  {
-                                                                             "num_iterations":  2000
+                                                                             "num_iterations":  25000,
+                                                                             "mode":  "global",
+                                                                             "global_num_morph_targets":  128,
+                                                                             "global_num_hidden_layers":  2,
+                                                                             "global_num_neurons_per_layer":  128
                                                                          }
                                                  },
                                        "upper_costume":  {
@@ -380,7 +384,8 @@
                                                     "static_reference_frames_dir":  "D:/UE/Unreal Projects/MLDeformerSample/UE57/pipeline/hou2ue/workspace/runs/20260301_162455_smoke/workspace/staging/smoke/gt/reference/frames",
                                                     "static_source_frames_dir":  "",
                                                     "render_mode":  "basecolor",
-                                                    "disable_ml_deformer_for_source":  false
+                                                    "disable_ml_deformer_for_source":  false,
+                                                    "extra_ue_cmd_args":  ["-d3dadapter=1"]
                                                 },
                                     "compare":  {
                                                     "metrics_profile":  "strict",
@@ -395,7 +400,7 @@
                                                                        "ms_ssim_p05_min":  0.65,
                                                                        "de2000_mean_max":  8.0,
                                                                        "de2000_p95_max":  15.0,
-                                                                       "_thresholds_note":  "Phase T: LBS-ref vs MLD-src. Measured 2026-03-05: ssim_mean=0.8832, psnr_mean=24.78, de2000_mean=3.62 (pre-3/3 NMM model, warmup16). Thresholds set ~5-10% below measurement."
+                                                                       "_thresholds_note":  "Phase U: LBS-ref vs MLD-src (5kGreedyROM retrain). T v4b confirmed Refference NMM ssim_mean=0.9142, psnr_mean=30.63, de2000_mean=1.58. Thresholds set conservatively at ~10% below T v4b measurement. Target: pipeline-trained NMM >= Refference NMM baseline."
                                                                    },
                                                     "fail_on_frame_count_mismatch":  true
                                                 }

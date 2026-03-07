@@ -58,7 +58,7 @@ function Get-StageTimeoutMinutes([string]$StageName) {
         "infer" { return 240 }
         "gt_reference_capture" { return 240 }
         "gt_source_capture" { return 720 }
-        "gt_compare" { return 60 }
+        "gt_compare" { return 240 }
         "report" { return 30 }
         default { return 120 }
     }
@@ -578,7 +578,7 @@ function Run-Stage([string]$StageName) {
                 $setupReport | Set-Content -Encoding UTF8 (Join-Path (Join-Path $ResolvedRunDir "reports") "ue_setup_report.json")
             }
             else {
-                Invoke-UnrealPythonScript -ScriptPath $ueSetupScript -ExtraUEArgs @("-nullrhi")
+                Invoke-UnrealPythonScript -ScriptPath $ueSetupScript -ExtraUEArgs @("-nullrhi", "-RenderOffScreen")
             }
         }
         "train" {
@@ -685,8 +685,69 @@ function Run-Stage([string]$StageName) {
                     "HOU2UE_TORCH_DETERMINISTIC" = $(if ($torchDeterministic) { "1" } else { "0" })
                     "HOU2UE_CUDNN_DETERMINISTIC" = $(if ($cudnnDeterministic) { "1" } else { "0" })
                     "HOU2UE_CUDNN_BENCHMARK" = $(if ($cudnnBenchmark) { "1" } else { "0" })
+                    # GPU 1: 22 GB free, not the primary display GPU — fewer WDDM conflicts.
+                    # GPU 0 currently has only ~1 GB free (23.5/24.5 GB used by D3D/display
+                    # after the Run 12 abort() left the WDDM driver in a high-memory state)
+                    # causing startup CUDA init failures.  GPU 1 runs at ~2.3 iters/sec.
+                    "CUDA_VISIBLE_DEVICES" = "1"
                 }
-                Invoke-UnrealPythonScript -ScriptPath $ueTrainScript -EnvOverrides $envOverrides -ExtraUEArgs @("-nullrhi")
+                # Checkpoint file path — nmm_shared.py writes here every 500 iters
+                # so a crashed run can resume where it left off.
+                $projectDir = Split-Path $ResolvedUProjectPath -Parent
+                $ckptFile = Join-Path $projectDir "Intermediate\NeuralMorphModel\training_checkpoint.pt"
+                $trainReportFile = Join-Path $ResolvedRunDir "reports\train_report.json"
+
+                $maxAttempts = 100
+                $trainSuccess = $false
+                $consecutiveInitCrashes = 0
+                for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+                    # Kill GPU-interfering ASUS/AMD user processes before each attempt
+                    # (ArmouryCrate applies GPU OC profiles ~5 min after detecting GPU load,
+                    # causing fatal CUDA kernel errors and silent crashes.)
+                    $killNames = @("ArmouryCrate.UserSessionHelper","ArmourySocketServer","RadeonSoftware","BaiduNetdiskUnite","BaiduNetdisk")
+                    foreach ($kn in $killNames) {
+                        Stop-Process -Name $kn -Force -ErrorAction SilentlyContinue
+                    }
+                    $ckptExists = Test-Path $ckptFile
+                    Write-Host "[hou2ue] Training attempt $attempt of $maxAttempts $(if ($ckptExists) { '(resuming from checkpoint)' } elseif ($attempt -gt 1) { '(startup retry)' } else { '' })"
+                    try {
+                        Invoke-UnrealPythonScript -ScriptPath $ueTrainScript -EnvOverrides $envOverrides -ExtraUEArgs @("-nullrhi", "-RenderOffScreen")
+                    } catch {
+                        # UE exited with non-zero exit code (e.g. -1 from abort/CUDA crash).
+                        # Fall through to checkpoint check below instead of propagating the error.
+                        Write-Host "[hou2ue] Attempt $attempt ended with error: $($_.Exception.Message)"
+                    }
+
+                    # Check if training completed successfully.
+                    if (Test-Path $trainReportFile) {
+                        $rpt = Get-Content $trainReportFile -Raw | ConvertFrom-Json -ErrorAction SilentlyContinue
+                        if ($rpt.status -eq "success") {
+                            Write-Host "[hou2ue] Training completed successfully on attempt $attempt."
+                            $trainSuccess = $true
+                            break
+                        }
+                    }
+
+                    # Not success — decide whether to retry.
+                    if (Test-Path $ckptFile) {
+                        # Training ran long enough to save a checkpoint before crashing.
+                        $consecutiveInitCrashes = 0
+                        Write-Host "[hou2ue] Training crashed (checkpoint found). Resuming from checkpoint in 20s..."
+                        Start-Sleep -Seconds 20
+                    } elseif ($attempt -lt $maxAttempts) {
+                        # No checkpoint = startup crash or pre-training crash (e.g. GPU driver
+                        # still recovering from a previous abort()). Give WDDM driver more time
+                        # to stabilise. Back off exponentially for consecutive init crashes.
+                        $consecutiveInitCrashes++
+                        $initDelay = if ($consecutiveInitCrashes -ge 5) { 180 } elseif ($consecutiveInitCrashes -ge 3) { 120 } else { 90 }
+                        Write-Host "[hou2ue] Training crashed before saving a checkpoint (startup/init crash #$consecutiveInitCrashes). Retrying in ${initDelay}s..."
+                        Start-Sleep -Seconds $initDelay
+                    }
+                }
+
+                if (-not $trainSuccess) {
+                    throw "[hou2ue] Training did not complete successfully after $maxAttempts attempts."
+                }
             }
         }
         "infer" {

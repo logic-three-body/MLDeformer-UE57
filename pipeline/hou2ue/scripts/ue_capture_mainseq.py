@@ -519,6 +519,11 @@ def main() -> int:
         if resume_start_frame > 0:
             cmd.append(f"-DemoStartFrame={resume_start_frame}")
 
+        # Append any extra UE command-line args supplied via config
+        # (e.g. ["-d3dadapter=1"] to force a specific GPU adapter).
+        extra_ue_cmd_args: List[str] = [str(a) for a in capture_cfg.get("extra_ue_cmd_args", []) if a]
+        cmd.extend(extra_ue_cmd_args)
+
         # full-sequence mode lets runtime executor derive range from sequence playback range.
         if frame_window != "full_sequence":
             raise RuntimeError(f"Unsupported frame_window mode: {frame_window}")

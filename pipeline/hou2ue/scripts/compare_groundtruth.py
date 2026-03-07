@@ -382,7 +382,11 @@ def main() -> int:
 
         rows: List[Dict[str, Any]] = []
         if not errors or (len(errors) == 1 and errors[0].get("severity") == "warning"):
+            import sys
+            print(f"[gt_compare] Starting frame comparison: {compare_count} frames", flush=True)
             for index in range(compare_count):
+                if index > 0 and index % 100 == 0:
+                    print(f"[gt_compare] Progress: {index}/{compare_count} frames processed", flush=True)
                 ref_path = ref_frames[index]
                 src_path = src_frames[index]
 
