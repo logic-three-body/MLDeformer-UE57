@@ -159,6 +159,150 @@ def _normalize_threshold_values(raw: Dict[str, Any]) -> Dict[str, float]:
     return out
 
 
+def _load_sample_count_from_cached_index(path: Path) -> int:
+    if not path.exists():
+        raise RuntimeError(f"Missing cached sample index file: {path}")
+
+    try:
+        import numpy as np  # type: ignore
+    except Exception as exc:
+        raise RuntimeError("numpy is required for outputs.bin QC sample count parsing") from exc
+
+    arr = np.load(path, allow_pickle=True)
+    if hasattr(arr, "shape") and len(arr.shape) >= 1:
+        count = int(arr.shape[0])
+    else:
+        count = int(len(arr))
+    if count <= 0:
+        raise RuntimeError(f"Invalid sample count from cached index: {count}")
+    return count
+
+
+def _scan_outputs_bin_max_abs(
+    outputs_path: Path,
+    sample_count: int,
+    sample_stride: int,
+    max_samples_for_scan: int,
+) -> Dict[str, Any]:
+    try:
+        import numpy as np  # type: ignore
+    except Exception as exc:
+        raise RuntimeError("numpy is required for outputs.bin QC scan") from exc
+
+    if sample_count <= 0:
+        raise RuntimeError(f"sample_count must be > 0, got {sample_count}")
+    if sample_stride <= 0:
+        raise RuntimeError(f"sample_stride must be > 0, got {sample_stride}")
+
+    data = np.memmap(outputs_path, dtype=np.float32, mode="r")
+    total_floats = int(data.size)
+    if total_floats <= 0:
+        raise RuntimeError(f"outputs.bin is empty: {outputs_path}")
+
+    if total_floats % sample_count != 0:
+        raise RuntimeError(
+            "outputs.bin float count is not divisible by sample_count: "
+            f"total_floats={total_floats} sample_count={sample_count}"
+        )
+
+    floats_per_sample = total_floats // sample_count
+    if floats_per_sample % sample_stride != 0:
+        raise RuntimeError(
+            "floats_per_sample is not divisible by sample_stride: "
+            f"floats_per_sample={floats_per_sample} sample_stride={sample_stride}"
+        )
+
+    components_per_sample = floats_per_sample // sample_stride
+    sample_max = np.empty(sample_count, dtype=np.float32)
+
+    scan_budget = max(1, int(max_samples_for_scan))
+    samples_per_chunk = max(1, scan_budget // max(1, floats_per_sample))
+
+    for start in range(0, sample_count, samples_per_chunk):
+        end = min(sample_count, start + samples_per_chunk)
+        base = start * floats_per_sample
+        tail = end * floats_per_sample
+        chunk = np.asarray(data[base:tail], dtype=np.float32)
+        chunk = chunk.reshape((end - start, components_per_sample, sample_stride))
+        sample_max[start:end] = np.max(np.abs(chunk), axis=(1, 2))
+
+    worst_index = int(np.argmax(sample_max)) if sample_count > 0 else -1
+    p50 = float(np.percentile(sample_max, 50))
+    p90 = float(np.percentile(sample_max, 90))
+    max_val = float(np.max(sample_max)) if sample_count > 0 else 0.0
+
+    return {
+        "outputs_path": str(outputs_path.resolve()),
+        "sample_count": sample_count,
+        "sample_stride": sample_stride,
+        "floats_per_sample": int(floats_per_sample),
+        "components_per_sample": int(components_per_sample),
+        "p50_max_cm": p50,
+        "p90_max_cm": p90,
+        "max_cm": max_val,
+        "worst_sample_index": worst_index,
+    }
+
+
+def _run_outputs_bin_qc(cfg: Dict[str, Any]) -> Dict[str, Any]:
+    report_cfg = cfg.get("report", {}) if isinstance(cfg.get("report"), dict) else {}
+    qc_cfg = report_cfg.get("outputs_bin_qc", {}) if isinstance(report_cfg.get("outputs_bin_qc"), dict) else {}
+
+    enabled = bool(qc_cfg.get("enabled", False))
+    threshold = float(qc_cfg.get("p50_max_cm", 30.0))
+    sample_stride = int(qc_cfg.get("sample_stride", 3))
+    max_samples_for_scan = int(qc_cfg.get("max_samples_for_scan", 30000000))
+
+    if not enabled:
+        return {
+            "enabled": False,
+            "status": "skipped",
+            "message": "outputs.bin QC disabled by config",
+        }
+
+    ue_cfg = cfg.get("paths", {}) if isinstance(cfg.get("paths"), dict) else {}
+    ue_project_root_raw = str(ue_cfg.get("ue_project_root", "") or "").strip()
+    if not ue_project_root_raw:
+        return {
+            "enabled": True,
+            "status": "skipped",
+            "message": "paths.ue_project_root missing; cannot locate Intermediate/NeuralMorphModel",
+        }
+
+    ue_project_root = Path(ue_project_root_raw)
+    model_root = ue_project_root / "Intermediate" / "NeuralMorphModel"
+    outputs_path = model_root / "outputs.bin"
+    sample_index_path = model_root / "cached_mask_index_per_sample.bin"
+
+    if not outputs_path.exists():
+        return {
+            "enabled": True,
+            "status": "skipped",
+            "message": f"outputs.bin not found: {outputs_path}",
+            "outputs_path": str(outputs_path.resolve()),
+        }
+
+    sample_count = _load_sample_count_from_cached_index(sample_index_path)
+    stats = _scan_outputs_bin_max_abs(
+        outputs_path=outputs_path,
+        sample_count=sample_count,
+        sample_stride=sample_stride,
+        max_samples_for_scan=max_samples_for_scan,
+    )
+
+    passed = stats["p50_max_cm"] <= threshold
+    stats.update(
+        {
+            "enabled": True,
+            "status": "success" if passed else "failed",
+            "threshold_p50_max_cm": threshold,
+            "passed": bool(passed),
+            "sample_index_path": str(sample_index_path.resolve()),
+        }
+    )
+    return stats
+
+
 def main() -> int:
     args = parse_args()
     run_dir = Path(args.run_dir)
@@ -360,6 +504,27 @@ def main() -> int:
                         }
                     )
 
+            outputs_bin_qc: Dict[str, Any] = {}
+            try:
+                outputs_bin_qc = _run_outputs_bin_qc(cfg)
+            except Exception as exc:
+                outputs_bin_qc = {
+                    "enabled": True,
+                    "status": "failed",
+                    "message": f"outputs.bin QC exception: {exc}",
+                }
+
+            if outputs_bin_qc.get("enabled") and outputs_bin_qc.get("status") == "failed":
+                failures.append(
+                    {
+                        "stage": "outputs_bin_qc",
+                        "message": (
+                            "outputs.bin QC failed: p50_max exceeds threshold or data could not be parsed."
+                        ),
+                        "details": outputs_bin_qc,
+                    }
+                )
+
         status = "success" if not failures else "failed"
 
         pipeline_report = {
@@ -425,6 +590,7 @@ def main() -> int:
                     if train_determinism_report_path.exists()
                     else "missing"
                 ),
+                "outputs_bin_qc": outputs_bin_qc,
             },
             "errors": failures,
         }
@@ -453,6 +619,7 @@ def main() -> int:
                 "pipeline_report_latest": str((run_dir / "reports" / "pipeline_report_latest.json").resolve()),
                 "resolved_config_yaml": str(resolved_yaml_path.resolve()),
                 "latest_copy_dir": str(latest_dir.resolve()),
+                "outputs_bin_qc": outputs_bin_qc,
             },
             errors=failures,
         )

@@ -243,9 +243,9 @@
                                                                               ],
                                                      "test_anim_sequence":  "/Game/Characters/Emil/Animation/Test/Emil_box_in_place_test",
                                                      "model_overrides":  {
-                                                                             "num_iterations":  25000,
+                                                                             "num_iterations":  50000,
                                                                              "mode":  "global",
-                                                                             "global_num_morph_targets":  512,
+                                                                             "global_num_morph_targets":  256,
                                                                              "global_num_hidden_layers":  2,
                                                                              "global_num_neurons_per_layer":  256
                                                                          }
