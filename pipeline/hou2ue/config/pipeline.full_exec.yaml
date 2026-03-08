@@ -245,9 +245,9 @@
                                                      "model_overrides":  {
                                                                              "num_iterations":  25000,
                                                                              "mode":  "global",
-                                                                             "global_num_morph_targets":  128,
+                                                                             "global_num_morph_targets":  256,
                                                                              "global_num_hidden_layers":  2,
-                                                                             "global_num_neurons_per_layer":  128
+                                                                             "global_num_neurons_per_layer":  256
                                                                          }
                                                  },
                                        "upper_costume":  {
@@ -507,6 +507,13 @@
             "reference_setup_dump",
             "setup_diff"
         ],
-        "_note": "GT-only partial run: upstream pipeline stages (Houdini, UE import, infer) and strict_clone dump stages are intentionally absent. Only train + GT capture/compare stages are validated."
+        "_note": "GT-only partial run: upstream pipeline stages (Houdini, UE import, infer) and strict_clone dump stages are intentionally absent. Only train + GT capture/compare stages are validated.",
+        "outputs_bin_qc": {
+            "enabled": true,
+            "p50_max_cm": 30.0,
+            "sample_stride": 3,
+            "max_samples_for_scan": 30000000,
+            "_note": "Phase W gate: fail report when outputs.bin p50 of abs deltas exceeds 30 cm."
+        }
     }
 }
