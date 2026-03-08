@@ -235,7 +235,7 @@
                                                      "deformer_graph":  "/Game/Characters/Emil/Deformers/DG_LBS_Morph_RecomputeNormals",
                                                      "training_input_anims":  [
                                                                                   {
-                                                                                      "_note_training_history":  "Phase V2 (2026-03-07): V-1/Phase-U used LocalMode (1680MB model, ssim=0.66). Root cause: Epic Refference is GlobalMode+128morphs (306MB=128*200k*3*4bytes). Switching to mode=global+global_num_morph_targets=128 to match Epic architecture. Using 5kGreedyROM for wide pose coverage.",
+                                                                                      "_note_training_history":  "Phase U (2026-03-05): smoke GC T v2 ssim=0.5904 FAIL (p50=90.7cm bad GC, Houdini unit error). hero64 GC T v4 ssim=0.637 FAIL (pose coverage insufficient). Now using 5kGreedyROM (PDG original Feb02, 8.46GB, p50<30cm, wide pose coverage -- most likely matches Epic Refference 306MB training data).",
                                                                                       "anim_sequence":  "/Game/Characters/Emil/Animation/MLD_train/upperBodyFlesh_5kGreedyROM",
                                                                                       "geometry_cache_template":  "/Game/Characters/Emil/GeomCache/MLD_Train/GC_upperBodyFlesh_5kGreedyROM",
                                                                                       "enabled":  true
