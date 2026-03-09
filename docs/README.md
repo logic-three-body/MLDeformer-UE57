@@ -3,6 +3,8 @@
 > **UE 版本**：5.7 · **本工作区**：`MLDeformerSample/UE57/`（独立 git 仓库）  
 > **配套 UE5.5 文档**：`../../docs/README.md`（理论/源码/数据管线层）  
 
+> **最新验证结果**：Phase W 已在 UE5.7 工作流上通过 W-3B NNM 闭环，`ssim_mean=0.9960`。兼容性结论已更新到 `07_ue57_compat/` 与 `02_code_map/`。
+
 ---
 
 ## 本工作区的定位
@@ -62,6 +64,7 @@
 
 | 文件 | 说明 |
 |------|------|
+| [02_code_map/README_UE57_CodeMap_Diff_CN.md](02_code_map/README_UE57_CodeMap_Diff_CN.md) | UE5.5 → UE5.7 code-map delta，并补充了 Phase W Local vs NNM 的代码路径结论 |
 | [07_ue57_compat/README_UE57_Breaking_Changes_CN.md](07_ue57_compat/README_UE57_Breaking_Changes_CN.md) | UE5.5 → UE5.7 MLDeformer API 变更详细分析，含结论速查表 |
 | [07_ue57_compat/README_UE57_Migration_Checklist_CN.md](07_ue57_compat/README_UE57_Migration_Checklist_CN.md) | 迁移验收 Checklist，含 A-F 六个阶段状态追踪 |
 

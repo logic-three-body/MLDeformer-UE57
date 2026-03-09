@@ -34,6 +34,7 @@ docs/
 
 | 优先级 | 文件 | 一句话说明 |
 |--------|------|-----------|
+| ★★★ | [02_code_map/README_UE57_CodeMap_Diff_CN.md](02_code_map/README_UE57_CodeMap_Diff_CN.md) | UE5.7 code-map delta + Phase W Local vs NNM 路径差异回写 |
 | ★★★ | [07_ue57_compat/README_UE57_Migration_Checklist_CN.md](07_ue57_compat/README_UE57_Migration_Checklist_CN.md) | 迁移状态 A-F Checklist，进度一览 |
 | ★★★ | [07_ue57_compat/README_UE57_Breaking_Changes_CN.md](07_ue57_compat/README_UE57_Breaking_Changes_CN.md) | API 变更详细列表（结论：零改动）|
 | ★★ | [../README.md](../README.md) | Hub 根目录总览（目录结构、适配策略、快速运行）|

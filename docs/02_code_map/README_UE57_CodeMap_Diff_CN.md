@@ -160,3 +160,57 @@ is out of scope and not installed/enabled.
 | `SampleGroundTruthPositionsAtFrame` | `SampleGroundTruthPositions(float)` | new frame-index API | Only affects `skip_train=false` path | 3.2 |
 | `mldeformer/` Python package | ❌ not present | engine-bundled | Not imported by pipeline scripts | 3.3 |
 | `FMLDeformerTrainingDataProcessorAnim` | ❌ not present | new wrapper struct | Not Python-reflected; bridge bypasses it | 3.2 |
+
+---
+
+## 8. Phase W 实战回写：这次巨大差异不是 API 兼容偶然
+
+2026-03-09 的 Phase W 闭环给这份 code-map diff 补了一个非常重要的工程结论：
+
+> **W-3A 受限 Local 与 W-3B NNM 的结果差距极大，并不是因为 UE5.5 → UE5.7 出现了新的 Breaking API。真正决定结果的是模型执行路径本身。**
+
+### 8.1 这次两条路径的实测结果
+
+| 路线 | 关键配置 | 结果 |
+|------|----------|------|
+| W-3A 受限 Local | `mode: local` + `local_num_morph_targets_per_bone: 1` | `ssim_mean=0.5550`，失败 |
+| W-3B NNM | `model_type: NNM` + 单 section 邻域配置 | `ssim_mean=0.9960`，闭环成功 |
+
+### 8.2 为什么这不是 compat 层问题
+
+本文件前面已经列出的 UE5.7 变更点，主要是：
+
+- 新枚举 `EMLDeformerSkinningMode`
+- masking 结构改名
+- `UNearestNeighborModelSection` 的 UObject 化
+- 个别废弃 API / 新签名
+
+这些变更都不会自然地产生“0.5550 vs 0.9960”这种量级差异。它们最多影响：
+
+- 配置字段如何映射
+- 某些桥接代码是否需要 rename shim
+- 训练 / 采样路径是否要适配新签名
+
+而这次两条路线都使用了同一条 UE5.7 pipeline、同一套训练输入、同一套 capture/compare 闭环。差异来自**模型如何表达局部姿态细节**，不是 compat API 是否调用成功。
+
+### 8.3 真正相关的代码路径差异
+
+对本次结果最关键的路径不是 compat shim，而是运行时/训练时模型结构差异：
+
+- NMM 路线：以基础网络预测为主
+- NNM 路线：`UNearestNeighborModelInstance::Execute` + `RunNearestNeighborModel` 两段式执行
+
+也就是说，W-3B 的成功来自：
+
+1. 基础网络先给出稳定预测；
+2. 邻域检索分支再对相似姿态做局部细节补偿。
+
+而 W-3A 受限 Local 失败的原因，是在 `local_num_morph_targets_per_bone=1` 这个极小容量下，局部模型根本不够表达复杂上臂/脖颈姿态。
+
+### 8.4 对后续 UE5.7 工作的直接指导
+
+以后在 UE5.7 上遇到类似问题时，优先按下面顺序判断：
+
+1. 如果怀疑 compat 问题，先查本文件列出的 API rename / signature diff。
+2. 如果 pipeline 能正常完成 `ue_setup -> train -> capture -> compare`，但质量差距巨大，就不要再把主因归到 API 兼容层。
+3. 对于少量连续帧、局部身体区域、姿态相关误差，优先评估 NNM 路线，而不是继续堆 Global 容量或把 Local 容量压得过低。

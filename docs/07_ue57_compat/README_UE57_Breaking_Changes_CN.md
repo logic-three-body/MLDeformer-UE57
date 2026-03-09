@@ -16,6 +16,8 @@
 | 废弃 API（Deprecated，未移除）| 1 | 源工程中未调用，无影响 |
 | 导出宏风格变更 | 1 | 仅影响插件内部，调用方无感知 |
 
+**2026-03-09 Phase W 回写**：W-3B NNM 在 UE5.7 smoke 闭环达到 `ssim_mean=0.9960`。这次经验进一步说明，先前 W-3A 与 W-3B 的巨大结果差异并不是 UE5.7 API breaking change 造成的，而是模型路线差异造成的。
+
 ---
 
 ## 2. 详细变更列表
@@ -183,4 +185,22 @@ MLDeformer/
 
 ---
 
-*文档生成于 UE5.7 compat workspace 初始化阶段。如发现新的兼容性问题请更新本文档并同步 `README_UE57_Migration_Checklist_CN.md`。*
+## 6. Phase W 额外兼容性结论（2026-03-09）
+
+为了避免后续排障反复走偏，这里把一个重要结论单独写明：
+
+> **如果 UE5.7 pipeline 已经能完整跑通 `ue_setup`、`train`、`gt_reference_capture`、`gt_source_capture`、`gt_compare`，而质量仍有巨大差异，那主因大概率已经不在 compat 层。**
+
+本次 W-3A / W-3B 正是这样：
+
+- 两者都跑在同一套 UE5.7 工作流上；
+- 两者都没有暴露新的 API 签名问题；
+- 但 Local 受限分支失败，NNM 分支成功。
+
+因此，对 UE5.7 的判断应更新为：
+
+1. **compat 层已足够稳定**，不是当前 Phase W 质量瓶颈；
+2. 后续质量优化应主要从模型路径、训练数据覆盖、局部姿态簇分析入手；
+3. 对局部连续误差，NNM 是已经被实证验证有效的路线。
+
+*文档生成于 UE5.7 compat workspace 初始化阶段，并于 Phase W 闭环后补充实战结论。如发现新的兼容性问题请更新本文档并同步 `README_UE57_Migration_Checklist_CN.md`。*

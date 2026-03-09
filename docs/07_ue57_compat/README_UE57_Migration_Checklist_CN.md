@@ -3,6 +3,8 @@
 > 将 UE5.5 MLDeformerSample 工程迁移到 UE5.7 的完整验收清单。  
 > 每项完成后打 ✅，若有问题描述在「备注」列。
 
+> **最新状态补充（2026-03-09）**：Phase W 已在 UE5.7 工作流上完成 W-3B NNM smoke 闭环，`ssim_mean=0.9960`。这意味着当前 compat 层已经足够支撑高质量训练与验证，后续瓶颈判断应优先落在模型路径和数据覆盖，而不是迁移接口本身。
+
 ---
 
 ## 阶段 A：工程基础迁移
@@ -115,6 +117,20 @@
 | T5 | 检查 `train_report.json`：3 个模型均 success，`.nmn` / `.ubnne` 路径有效 | ✅ | `train_report.json` 已确认 success，`train_determinism_report.json` 生成 |
 | T6 | `gt_compare_report.json`：BaseColor 模式下 SSIM ≥ 0.92（无 Lumen 底线噪声）| ⬜ | Phase R BaseColor 验证中 |
 | T7 | 达标后将 `ssim_mean_min` 提升至 0.92，移除 `debug_mode: true` | ⬜ | Phase R 验证通过后修改 |
+
+---
+
+## 阶段 W：Phase W 闭环验证（2026-03-09）
+
+| # | 检查项 | 状态 | 备注 |
+|---|--------|------|------|
+| W1 | W-2C Global NMM 平台期已确认（`ssim≈0.9004`） | ✅ | 继续扩容 Global NMM 无实质收益 |
+| W2 | W-3A 受限 Local 作为负对照已完成 | ✅ | `local_num_morph_targets_per_bone=1`，`ssim_mean=0.5550`，判定失败分支 |
+| W3 | W-3B NNM 配置在隔离 run dir 上 `ue_setup` 成功应用 | ✅ | `model_type=NNM`，训练输入解析正确 |
+| W4 | W-3B `train` 成功完成 | ✅ | 前两次启动失败后，第 3 次自动重试成功 |
+| W5 | W-3B capture/compare/report 全链成功 | ✅ | `gt_reference_capture` / `gt_source_capture` / `gt_compare` / `report` 全 success |
+| W6 | W-3B smoke 指标达成近逐帧重合 | ✅ | `ssim_mean=0.9960`，`ssim_p05=0.9929`，`edge_iou_mean=0.9942` |
+| W7 | Compat 层不是 Phase W 主瓶颈这一结论已确认 | ✅ | 两方案差异来自模型路径，不是 UE5.7 API 变更 |
 
 ---
 
