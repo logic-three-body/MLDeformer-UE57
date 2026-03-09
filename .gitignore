@@ -1,7 +1,7 @@
 # UE57 compat workspace — pipeline hub git repo
 # UE project lives at D:\UE\Unreal Projects\UE57\MLDeformerSample\ (separate path, not tracked here)
 
-# Pipeline run outputs
+# Pipeline run outputs and local upload helpers
 pipeline/hou2ue/workspace/
 
 # Python
