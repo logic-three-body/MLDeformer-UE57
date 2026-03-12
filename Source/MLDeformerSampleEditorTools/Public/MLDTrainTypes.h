@@ -150,4 +150,13 @@ struct MLDEFORMERSAMPLEEDITORTOOLS_API FMldDumpResult
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MLDeformer")
 	FString model_overrides_json;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MLDeformer")
+	FString model_properties_json;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MLDeformer")
+	FString viz_settings_json;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MLDeformer")
+	FString asset_properties_json;
 };

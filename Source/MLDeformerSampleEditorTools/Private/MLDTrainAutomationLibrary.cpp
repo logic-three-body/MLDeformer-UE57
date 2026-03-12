@@ -34,6 +34,19 @@ DEFINE_LOG_CATEGORY_STATIC(LogMLDTrainAutomation, Log, All);
 
 namespace
 {
+	constexpr int32 MaxPreviewArrayItems = 16;
+	constexpr int32 MaxStructDepth = 3;
+	constexpr int32 MaxStringLength = 1024;
+
+	FString TruncateString(const FString& InValue)
+	{
+		if (InValue.Len() <= MaxStringLength)
+		{
+			return InValue;
+		}
+		return InValue.Left(MaxStringLength) + TEXT("...(truncated)");
+	}
+
 	FString NormalizeAssetPath(const FString& InAssetPath)
 	{
 		FString AssetPath = InAssetPath;
@@ -1348,6 +1361,143 @@ namespace
 		}
 		return Model ? Model->GetClass()->GetName() : TEXT("");
 	}
+
+	TSharedPtr<FJsonValue> MakeJsonValueFromProperty(const FProperty* Property, const void* ValuePtr, int32 Depth = 0)
+	{
+		if (!Property || !ValuePtr)
+		{
+			return MakeShared<FJsonValueNull>();
+		}
+
+		if (const FBoolProperty* BoolProp = CastField<FBoolProperty>(Property))
+		{
+			return MakeShared<FJsonValueBoolean>(BoolProp->GetPropertyValue(ValuePtr));
+		}
+
+		if (const FIntProperty* IntProp = CastField<FIntProperty>(Property))
+		{
+			return MakeShared<FJsonValueNumber>(IntProp->GetPropertyValue(ValuePtr));
+		}
+
+		if (const FInt64Property* Int64Prop = CastField<FInt64Property>(Property))
+		{
+			return MakeShared<FJsonValueNumber>(static_cast<double>(Int64Prop->GetPropertyValue(ValuePtr)));
+		}
+
+		if (const FFloatProperty* FloatProp = CastField<FFloatProperty>(Property))
+		{
+			return MakeShared<FJsonValueNumber>(FloatProp->GetPropertyValue(ValuePtr));
+		}
+
+		if (const FDoubleProperty* DoubleProp = CastField<FDoubleProperty>(Property))
+		{
+			return MakeShared<FJsonValueNumber>(DoubleProp->GetPropertyValue(ValuePtr));
+		}
+
+		if (const FStrProperty* StrProp = CastField<FStrProperty>(Property))
+		{
+			return MakeShared<FJsonValueString>(TruncateString(StrProp->GetPropertyValue(ValuePtr)));
+		}
+
+		if (const FTextProperty* TextProp = CastField<FTextProperty>(Property))
+		{
+			return MakeShared<FJsonValueString>(TruncateString(TextProp->GetPropertyValue(ValuePtr).ToString()));
+		}
+
+		if (const FNameProperty* NameProp = CastField<FNameProperty>(Property))
+		{
+			return MakeShared<FJsonValueString>(NameProp->GetPropertyValue(ValuePtr).ToString());
+		}
+
+		if (const FByteProperty* ByteProp = CastField<FByteProperty>(Property))
+		{
+			if (ByteProp->IsEnum())
+			{
+				return MakeShared<FJsonValueString>(ByteProp->Enum->GetNameStringByValue(ByteProp->GetPropertyValue(ValuePtr)));
+			}
+			return MakeShared<FJsonValueNumber>(ByteProp->GetPropertyValue(ValuePtr));
+		}
+
+		if (const FEnumProperty* EnumProp = CastField<FEnumProperty>(Property))
+		{
+			const int64 EnumValue = EnumProp->GetUnderlyingProperty()->GetSignedIntPropertyValue(ValuePtr);
+			return MakeShared<FJsonValueString>(EnumProp->GetEnum()->GetNameStringByValue(EnumValue));
+		}
+
+		if (const FObjectPropertyBase* ObjectProp = CastField<FObjectPropertyBase>(Property))
+		{
+			UObject* ObjectValue = ObjectProp->GetObjectPropertyValue(ValuePtr);
+			return MakeShared<FJsonValueString>(ObjectValue ? ObjectValue->GetPathName() : TEXT(""));
+		}
+
+		if (const FSoftObjectProperty* SoftObjectProp = CastField<FSoftObjectProperty>(Property))
+		{
+			const FSoftObjectPtr SoftObject = SoftObjectProp->GetPropertyValue(ValuePtr);
+			return MakeShared<FJsonValueString>(SoftObject.ToSoftObjectPath().ToString());
+		}
+
+		if (const FArrayProperty* ArrayProp = CastField<FArrayProperty>(Property))
+		{
+			FScriptArrayHelper ArrayHelper(ArrayProp, ValuePtr);
+			TSharedPtr<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+			JsonObject->SetStringField(TEXT("__kind"), TEXT("array_summary"));
+			JsonObject->SetStringField(TEXT("item_type"), ArrayProp->Inner ? ArrayProp->Inner->GetClass()->GetName() : TEXT(""));
+			JsonObject->SetNumberField(TEXT("num"), ArrayHelper.Num());
+
+			TArray<TSharedPtr<FJsonValue>> PreviewItems;
+			const int32 PreviewCount = FMath::Min(ArrayHelper.Num(), MaxPreviewArrayItems);
+			for (int32 Index = 0; Index < PreviewCount; ++Index)
+			{
+				PreviewItems.Add(MakeJsonValueFromProperty(ArrayProp->Inner, ArrayHelper.GetRawPtr(Index), Depth + 1));
+			}
+			JsonObject->SetArrayField(TEXT("preview"), PreviewItems);
+			JsonObject->SetBoolField(TEXT("truncated"), ArrayHelper.Num() > PreviewCount);
+			return MakeShared<FJsonValueObject>(JsonObject);
+		}
+
+		if (const FStructProperty* StructProp = CastField<FStructProperty>(Property))
+		{
+			TSharedPtr<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+			JsonObject->SetStringField(TEXT("__struct_type"), StructProp->Struct ? StructProp->Struct->GetName() : TEXT(""));
+			if (Depth >= MaxStructDepth)
+			{
+				JsonObject->SetBoolField(TEXT("truncated"), true);
+				return MakeShared<FJsonValueObject>(JsonObject);
+			}
+
+			for (TFieldIterator<FProperty> It(StructProp->Struct); It; ++It)
+			{
+				const FProperty* InnerProp = *It;
+				JsonObject->SetField(InnerProp->GetName(), MakeJsonValueFromProperty(InnerProp, InnerProp->ContainerPtrToValuePtr<void>(ValuePtr), Depth + 1));
+			}
+			return MakeShared<FJsonValueObject>(JsonObject);
+		}
+
+		return MakeShared<FJsonValueString>(TEXT("<unsupported>"));
+	}
+
+	FString SerializeAllProperties(UObject* Object)
+	{
+		const TSharedPtr<FJsonObject> RootObject = MakeShared<FJsonObject>();
+		if (!Object)
+		{
+			return SerializeJsonObject(RootObject);
+		}
+
+		for (TFieldIterator<FProperty> It(Object->GetClass()); It; ++It)
+		{
+			const FProperty* Property = *It;
+			if (!Property)
+			{
+				continue;
+			}
+
+			const void* ValuePtr = Property->ContainerPtrToValuePtr<void>(Object);
+			RootObject->SetField(Property->GetName(), MakeJsonValueFromProperty(Property, ValuePtr, 0));
+		}
+
+		return SerializeJsonObject(RootObject);
+	}
 }
 
 FMldTrainResult UMLDTrainAutomationLibrary::TrainDeformerAsset(const FMldTrainRequest& Request)
@@ -1534,6 +1684,9 @@ FMldDumpResult UMLDTrainAutomationLibrary::DumpDeformerSetup(const FMldDumpReque
 	Result.training_input_anims_json = BuildTrainingInputsJson(Cast<UMLDeformerGeomCacheModel>(RuntimeModel));
 	Result.nnm_sections_json = BuildNnmSectionsJson(Cast<UNearestNeighborModel>(RuntimeModel));
 	Result.model_overrides_json = BuildModelOverridesJson(RuntimeModel);
+	Result.model_properties_json = SerializeAllProperties(RuntimeModel);
+	Result.viz_settings_json = SerializeAllProperties(RuntimeModel->GetVizSettings());
+	Result.asset_properties_json = SerializeAllProperties(DeformerAsset);
 	Result.success = true;
 	Result.message = TEXT("Dump completed.");
 	return Result;
